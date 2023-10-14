@@ -25,6 +25,8 @@ class lsp_server =
         log_info notify_back (Workspace.ain_path ws ^ " loaded")
       with e -> log_error notify_back (Exn.to_string e)
 
+    method spawn_query_handler f = Linol_lwt.spawn f
+
     method! on_req_initialize ~notify_back i =
       (match i.rootPath with
       | Some (Some path) -> self#load_workspace ~notify_back path
