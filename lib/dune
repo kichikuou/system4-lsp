@@ -1,2 +1,3 @@
 (library
- (name system4_lsp))
+ (name system4_lsp)
+ (libraries sys4c))
