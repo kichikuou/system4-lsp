@@ -452,8 +452,9 @@ class type_analyze_visitor ctx = object (self)
     | Labeled (_, _) -> ()
     | If (test, _, _) | While (test, _) | DoWhile (test, _) ->
         type_check (ASTStatement (stmt)) Int test
-    | For (_, test, _, _) ->
+    | For (_, Some test, _, _) ->
         type_check (ASTStatement (stmt)) Int test
+    | For (_, None, _, _) -> ()
     | Goto (_) -> ()
     | Continue -> ()
     | Break -> ()
