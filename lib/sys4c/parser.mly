@@ -68,7 +68,7 @@ let member_func typespec_opt struct_name is_dtor name params body =
 %token SWAP
 /* delimiters */
 %token LPAREN RPAREN RBRACKET LBRACKET LBRACE RBRACE
-%token QUESTION COLON SEMICOLON COCO COMMA DOT HASH
+%token QUESTION COLON SEMICOLON COCO AT COMMA DOT HASH
 /* types */
 %token VOID CHAR INT FLOAT BOOL STRING HLL_STRUCT HLL_PARAM HLL_FUNC HLL_DELEGATE
 %token IMAINSYSTEM
@@ -269,10 +269,8 @@ type_qualifier
 type_specifier
   : atomic_type_specifier { $1 }
   (* FIXME: this disallows arrays/wraps of ref-qualified types *)
-  | ARRAY LT type_specifier GT { Array (qtype None $3) }
-  | ARRAY LT QUESTION GT { Array (qtype None Void) }
-  | WRAP LT type_specifier GT { Wrap (qtype None $3) }
-  | WRAP LT QUESTION GT { Wrap (qtype None Void) }
+  | ARRAY AT type_specifier { Array (qtype None $3) }
+  | WRAP AT type_specifier { Wrap (qtype None $3) }
   | IDENTIFIER { Unresolved ($1) }
 
 statement
