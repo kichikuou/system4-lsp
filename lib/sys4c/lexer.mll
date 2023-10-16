@@ -190,6 +190,7 @@ rule token = parse
   | "<<="                   { LSHIFTASSIGN }
   | ">>="                   { RSHIFTASSIGN }
   | "<-"                    { REFASSIGN }
+  | "<=>"                   { SWAP }
   | '.'                     { DOT }
   | ','                     { COMMA }
   | ':'                     { COLON }

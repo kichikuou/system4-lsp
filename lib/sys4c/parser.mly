@@ -60,6 +60,7 @@ let func typespec name params body =
 /* assignment */
 %token ASSIGN PLUSASSIGN MINUSASSIGN TIMESASSIGN DIVIDEASSIGN MODULOASSIGN
 %token ORASSIGN XORASSIGN ANDASSIGN LSHIFTASSIGN RSHIFTASSIGN REFASSIGN
+%token SWAP
 /* delimiters */
 %token LPAREN RPAREN RBRACKET LBRACKET LBRACE RBRACE
 %token QUESTION COLON SEMICOLON COMMA DOT HASH
@@ -278,6 +279,7 @@ statement
   | jump_statement { stmt $1 }
   | message_statement { stmt $1 }
   | rassign_statement { stmt $1 }
+  | objswap_statement { stmt $1 }
   ;
 
 switch_statement
@@ -350,6 +352,9 @@ message_statement
 
 rassign_statement
   : expression REFASSIGN expression SEMICOLON { RefAssign ($1, $3) }
+
+objswap_statement
+  : expression SWAP expression SEMICOLON { ObjSwap ($1, $3) }
 
 declaration
   : declaration_specifiers separated_nonempty_list(COMMA, init_declarator) SEMICOLON

@@ -501,6 +501,10 @@ class type_analyze_visitor ctx = object (self)
             (* FIXME? this isn't really a _type_ error *)
             ref_type_error (Option.value_exn rhs.valuetype).data (Some lhs) (ASTStatement stmt)
         end
+    | ObjSwap (lhs, rhs) ->
+        self#check_lvalue lhs (ASTStatement stmt);
+        self#check_lvalue rhs (ASTStatement stmt);
+        type_check (ASTStatement stmt) (Option.value_exn lhs.valuetype).data rhs
     end
 
   method visit_variable var =
