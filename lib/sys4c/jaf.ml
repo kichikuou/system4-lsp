@@ -172,6 +172,7 @@ type fundecl = {
   return : type_specifier;
   params : variable list;
   body : block_item list;
+  is_label: bool;
   mutable index : int option;
   mutable class_index : int option;
   mutable super_index : int option
