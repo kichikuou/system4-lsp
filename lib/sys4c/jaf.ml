@@ -136,22 +136,19 @@ and ast_expression =
   | New         of data_type  * expression list * int option
   | This
 
-type block_item =
-  | Statement    of statement
-  | Declarations of variable list
-and statement = {
+type statement = {
   mutable node : ast_statement;
-  mutable delete_vars : int list
 }
 and ast_statement =
   | EmptyStatement
+  | Declarations   of variable list
   | Expression     of expression
-  | Compound       of block_item list
+  | Compound       of statement list
   | Labeled        of string          * statement
   | If             of expression      * statement * statement
   | While          of expression      * statement
   | DoWhile        of expression      * statement
-  | For            of block_item      * expression option * expression option * statement
+  | For            of statement       * expression option * expression option * statement
   | Goto           of string
   | Continue
   | Break
@@ -175,7 +172,7 @@ type fundecl = {
   struct_name : string option;
   return : type_specifier;
   params : variable list;
-  body : block_item list;
+  body : statement list;
   is_label: bool;
   mutable index : int option;
   mutable class_index : int option;
@@ -381,11 +378,12 @@ class ivisitor ctx = object (self)
   method visit_statement (s : statement) =
     match s.node with
     | EmptyStatement -> ()
+    | Declarations (ds) -> List.iter ds ~f:self#visit_local_variable
     | Expression (e) ->
         self#visit_expression e
     | Compound (items) ->
         environment#push;
-        List.iter items ~f:self#visit_block_item;
+        List.iter items ~f:self#visit_statement;
         environment#pop
     | Labeled (_, a) ->
         self#visit_statement a
@@ -401,7 +399,7 @@ class ivisitor ctx = object (self)
         self#visit_expression test
     | For (init, test, inc, body) ->
         environment#push;
-        self#visit_block_item init;
+        self#visit_statement init;
         Option.iter test ~f:self#visit_expression;
         Option.iter inc ~f:self#visit_expression;
         self#visit_statement body;
@@ -432,14 +430,9 @@ class ivisitor ctx = object (self)
     Option.iter v.initval ~f:self#visit_expression;
     environment#push_var v
 
-  method visit_block_item item =
-    match item with
-    | Statement (s) -> self#visit_statement s
-    | Declarations (ds) -> List.iter ds ~f:self#visit_local_variable
-
   method visit_fundecl f =
     environment#enter_function f;
-    List.iter f.body ~f:self#visit_block_item;
+    List.iter f.body ~f:self#visit_statement;
     environment#leave_function
 
   method visit_declaration d =
@@ -594,11 +587,12 @@ let rec stmt_to_string (stmt : statement) =
   match stmt.node with
   | EmptyStatement ->
       ";"
+  | Declarations (ds) -> List.fold (List.map ds ~f:var_to_string) ~init:"" ~f:(^)
   | Expression (e) ->
       (expr_to_string e) ^ ";"
   | Compound (items) ->
       items
-      |> List.map ~f:block_item_to_string
+      |> List.map ~f:stmt_to_string
       |> List.fold ~init:"" ~f:(^)
   | Labeled (label, stmt) ->
       sprintf "%s: %s" label (stmt_to_string stmt)
@@ -613,7 +607,7 @@ let rec stmt_to_string (stmt : statement) =
       sprintf "do %s while (%s);" (stmt_to_string body) (expr_to_string test)
   | For (init, test, inc, body) ->
       let expr_opt_to_string = Option.value_map ~default:"" ~f:expr_to_string in
-      let s_init = block_item_to_string init in
+      let s_init = stmt_to_string init in
       let s_test = expr_opt_to_string test in
       let s_body = stmt_to_string body in
       let s_inc = expr_opt_to_string inc in
@@ -654,10 +648,6 @@ and var_to_string' d =
   sprintf "%s %s%s%s" t dims d.name init
 and var_to_string d =
   (var_to_string' d) ^ ";"
-and block_item_to_string item =
-  match item with
-  | Statement (s) -> stmt_to_string s
-  | Declarations (ds) -> List.fold (List.map ds ~f:var_to_string) ~init:"" ~f:(^)
 
 let decl_to_string d =
   let params_to_string = function
@@ -670,7 +660,7 @@ let decl_to_string d =
         sprintf "(%s)" (loop (var_to_string' p) ps)
   in
   let block_to_string block =
-    List.fold (List.map block ~f:block_item_to_string) ~init:"" ~f:(^)
+    List.fold (List.map block ~f:stmt_to_string) ~init:"" ~f:(^)
   in
   match d with
   | Global (d) ->
