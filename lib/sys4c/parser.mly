@@ -345,7 +345,7 @@ jump_statement
   ;
 
 message_statement
-  : C_CONSTANT IDENTIFIER SEMICOLON { MessageCall ($1, Some $2, None) }
+  : C_CONSTANT { MessageCall $1 }
   ;
 
 rassign_statement

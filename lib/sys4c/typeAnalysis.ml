@@ -441,7 +441,7 @@ class type_analyze_visitor ctx = object (self)
     (* rewrite character constants at statement-level as messages *)
     begin match stmt.node with
     | Expression ({node=ConstChar(msg); _}) ->
-        stmt.node <- MessageCall (msg, None, None)
+        stmt.node <- MessageCall msg
     | _ -> ()
     end;
     super#visit_statement stmt;
@@ -479,19 +479,7 @@ class type_analyze_visitor ctx = object (self)
             | _ -> data_type_error (jaf_to_ain_data_type f.return.data) None (ASTStatement stmt)
             end
         end
-    | MessageCall (msg, f_name, _) ->
-        begin match f_name with
-        | Some name ->
-          begin match Ain.get_function ctx.ain name with
-          | Some f ->
-              if f.nr_args > 0 then
-                arity_error f [] (ASTStatement stmt);
-              stmt.node <- MessageCall (msg, f_name, Some f.index);
-          | None ->
-              undefined_variable_error name (ASTStatement stmt)
-          end
-        | None -> ()
-        end
+    | MessageCall _ -> ()
     | RefAssign (lhs, rhs) ->
         (* rhs must be an lvalue in order to create a reference to it *)
         self#check_lvalue rhs (ASTStatement stmt);

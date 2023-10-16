@@ -157,7 +157,7 @@ and ast_statement =
   | Case           of expression      * statement
   | Default        of statement
   | Return         of expression option
-  | MessageCall    of string          * string option * int option
+  | MessageCall    of string
   | RefAssign      of expression      * expression
 and variable = {
   name      : string;
@@ -414,7 +414,7 @@ class ivisitor ctx = object (self)
         self#visit_statement stmt
     | Return (e) ->
         Option.iter e ~f:self#visit_expression
-    | MessageCall (_, _, _) -> ()
+    | MessageCall _ -> ()
     | RefAssign (a, b) ->
         self#visit_expression a;
         self#visit_expression b
@@ -626,11 +626,8 @@ let rec stmt_to_string (stmt : statement) =
       "return;"
   | Return (Some e) ->
       sprintf "return %s;" (expr_to_string e)
-  | MessageCall (msg, f, _) ->
-      begin match f with
-      | Some name -> sprintf "'%s' %s;" msg name
-      | None      -> sprintf "'%s';" msg
-      end
+  | MessageCall msg ->
+      sprintf "'%s';" msg
   | RefAssign (dst, src) ->
       sprintf "%s <- %s;" (expr_to_string dst) (expr_to_string src)
 and var_to_string' d =
