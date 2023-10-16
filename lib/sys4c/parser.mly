@@ -59,7 +59,7 @@ let member_func typespec_opt struct_name is_dtor name params body =
 /* bitwise */
 %token LSHIFT RSHIFT BITAND BITOR BITXOR
 /* logic/comparison */
-%token AND OR LT GT LTE GTE EQUAL NEQUAL
+%token AND OR LT GT LTE GTE EQUAL NEQUAL REF_EQUAL REF_NEQUAL
 /* unary */
 %token INC DEC BITNOT LOGNOT
 /* assignment */
@@ -186,6 +186,8 @@ eql_expression
   : rel_expression { $1 }
   | eql_expression EQUAL rel_expression { expr (Binary (Equal, $1, $3)) }
   | eql_expression NEQUAL rel_expression { expr (Binary (NEqual, $1, $3)) }
+  | eql_expression REF_EQUAL rel_expression { expr (Binary (RefEqual, $1, $3)) }
+  | eql_expression REF_NEQUAL rel_expression { expr (Binary (RefNEqual, $1, $3)) }
   ;
 
 and_expression

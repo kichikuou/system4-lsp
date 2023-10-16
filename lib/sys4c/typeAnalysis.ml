@@ -266,6 +266,14 @@ class type_analyze_visitor ctx = object (self)
                 check_expr a b
             end;
             expr.valuetype <- Some (Ain.Type.make Int)
+        | RefEqual | RefNEqual ->
+            begin match ((Option.value_exn a.valuetype).is_ref, (Option.value_exn b.valuetype).is_ref) with
+            | (true, true) ->
+                check_expr a b
+            | (false, _) -> ref_type_error Void (Some a) (ASTExpression expr)
+            | (_, false) -> ref_type_error Void (Some b) (ASTExpression expr)
+            end;
+            expr.valuetype <- Some (Ain.Type.make Int)
         end;
     | Assign (op, lhs, rhs) ->
         self#check_lvalue lhs (ASTExpression expr);
