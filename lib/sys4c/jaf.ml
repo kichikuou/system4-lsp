@@ -170,6 +170,7 @@ and variable = {
 
 type fundecl = {
   mutable name : string;
+  struct_name : string option;
   return : type_specifier;
   params : variable list;
   body : block_item list;

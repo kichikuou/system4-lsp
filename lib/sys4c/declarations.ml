@@ -155,8 +155,8 @@ class type_resolve_visitor ctx decl_only = object (self)
 
   method! visit_declaration decl =
     let function_class (f:fundecl) =
-      match String.split_on_chars f.name ~on:['@'] with
-      | hd :: _ -> Ain.get_struct_index ctx.ain hd
+      match f.struct_name with
+      | Some name -> Ain.get_struct_index ctx.ain name
       | _ -> None
     in
     let resolve_function f =
