@@ -105,6 +105,9 @@ let () =
               "functype",     FUNCTYPE;
               "delegate",     DELEGATE;
               "struct",       STRUCT;
+              "class",        CLASS;
+              "private",      PRIVATE;
+              "public",       PUBLIC;
               "enum",         ENUM;
               "imain_system", IMAINSYSTEM ]
 }
