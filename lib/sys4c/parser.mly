@@ -389,15 +389,15 @@ external_declaration
   : declaration
     { List.map (fun d -> Global (d)) $1 }
   | declaration_specifiers IDENTIFIER parameter_list block
-    { [Function (func $1 $2 $3 $4)] }
+    { [Function (func $1 $2 $3 (Some $4))] }
   | ioption(declaration_specifiers) IDENTIFIER COCO boption(BITNOT) IDENTIFIER parameter_list block
-    { [Function (member_func $1 $2 $4 $5 $6 $7)] }
+    { [Function (member_func $1 $2 $4 $5 $6 (Some $7))] }
   | HASH IDENTIFIER parameter_list block
-    { [Function { (func (qtype None Void) $2 $3 $4) with is_label=true }] }
+    { [Function { (func (qtype None Void) $2 $3 (Some $4)) with is_label=true }] }
   | FUNCTYPE declaration_specifiers IDENTIFIER functype_parameter_list SEMICOLON
-    { [FuncTypeDef (func $2 $3 $4 [])] }
+    { [FuncTypeDef (func $2 $3 $4 None)] }
   | DELEGATE declaration_specifiers IDENTIFIER functype_parameter_list SEMICOLON
-    { [DelegateDef (func $2 $3 $4 [])] }
+    { [DelegateDef (func $2 $3 $4 None)] }
   | struct_or_class IDENTIFIER LBRACE struct_declaration+ RBRACE SEMICOLON
     { [StructDef ({ is_class=$1; name=$2; decls=(List.concat $4) })] }
   | ENUM enumerator_list SEMICOLON
@@ -413,7 +413,7 @@ struct_or_class
 
 hll_declaration
   : declaration_specifiers IDENTIFIER parameter_list SEMICOLON
-    { [Function (func $1 $2 $3 [])] }
+    { [Function (func $1 $2 $3 None)] }
   | struct_or_class IDENTIFIER LBRACE struct_declaration+ RBRACE SEMICOLON
     { [StructDef ({ is_class=$1; name=$2; decls=(List.concat $4) })] }
   ;
@@ -454,12 +454,17 @@ struct_declaration
       |> decls $1
       |> List.map (fun d -> MemberDecl (d))
     }
-  | declaration_specifiers IDENTIFIER parameter_list block
+  | declaration_specifiers IDENTIFIER parameter_list opt_body
     { [Method (func $1 $2 $3 $4)] }
-  | IDENTIFIER LPAREN RPAREN block
+  | IDENTIFIER LPAREN RPAREN opt_body
     { [Constructor (func {data=Void; qualifier=None} $1 [] $4)] }
-  | BITNOT IDENTIFIER LPAREN RPAREN block
+  | BITNOT IDENTIFIER LPAREN RPAREN opt_body
     { [Destructor (func {data=Void; qualifier=None} $2 [] $5)] }
+  ;
+
+opt_body
+  : SEMICOLON { None }
+  | block { Some $1 }
   ;
 
 access_specifier

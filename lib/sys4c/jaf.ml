@@ -172,7 +172,7 @@ type fundecl = {
   struct_name : string option;
   return : type_specifier;
   params : variable list;
-  body : statement list;
+  body : statement list option;
   is_label: bool;
   mutable index : int option;
   mutable class_index : int option;
@@ -436,7 +436,7 @@ class ivisitor ctx = object (self)
 
   method visit_fundecl f =
     environment#enter_function f;
-    List.iter f.body ~f:self#visit_statement;
+    Option.iter f.body ~f:(List.iter ~f:self#visit_statement);
     environment#leave_function
 
   method visit_declaration d =
@@ -664,8 +664,9 @@ let decl_to_string d =
         in
         sprintf "(%s)" (loop (var_to_string' p) ps)
   in
-  let block_to_string block =
-    List.fold (List.map block ~f:stmt_to_string) ~init:"" ~f:(^)
+  let block_to_string = function
+    | None -> ";"
+    | Some block -> List.fold (List.map block ~f:stmt_to_string) ~init:"" ~f:(^)
   in
   match d with
   | Global (d) ->
