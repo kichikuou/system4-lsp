@@ -116,7 +116,8 @@ type call_type =
 
 type expression = {
   mutable valuetype : Ain.Type.t option;
-  mutable node : ast_expression
+  mutable node : ast_expression;
+  loc: Lexing.position * Lexing.position;
 }
 and ast_expression =
   | ConstInt    of int
@@ -138,6 +139,7 @@ and ast_expression =
 
 type statement = {
   mutable node : ast_statement;
+  loc: Lexing.position * Lexing.position;
 }
 and ast_statement =
   | EmptyStatement
