@@ -15,9 +15,31 @@ let to_lsp_position p =
   Lsp.Types.Position.create ~line:(p.Lexing.pos_lnum - 1)
     ~character:(p.Lexing.pos_cnum - p.Lexing.pos_bol)
 
-let to_lsp_range start end_ =
+let to_lsp_range (start, end_) =
   Lsp.Types.Range.create ~start:(to_lsp_position start)
     ~end_:(to_lsp_position end_)
+
+let predefined_constants =
+  [
+    Jaf.
+      {
+        name = "true";
+        type_spec = { data = Bool; qualifier = Some Const };
+        location = (Lexing.dummy_pos, Lexing.dummy_pos);
+        array_dim = [];
+        initval = None;
+        index = None;
+      };
+    Jaf.
+      {
+        name = "false";
+        type_spec = { data = Bool; qualifier = Some Const };
+        location = (Lexing.dummy_pos, Lexing.dummy_pos);
+        array_dim = [];
+        initval = None;
+        index = None;
+      };
+  ]
 
 class lsp_server =
   object (self)
@@ -41,15 +63,41 @@ class lsp_server =
       Lexing.set_filename lexbuf (Lsp.Types.DocumentUri.to_path uri);
       let diagnostics =
         try
-          let _ = Parser.jaf Lexer.token lexbuf in
-          []
-        with Parser.Error ->
-          let diag =
-            Lsp.Types.Diagnostic.create
-              ~range:(to_lsp_range lexbuf.lex_start_p lexbuf.lex_curr_p)
-              ~message:"Syntax error." ()
+          let ctx =
+            Jaf.
+              {
+                ain;
+                import_ain = Ain.create 4 0;
+                const_vars = predefined_constants;
+              }
           in
-          [ diag ]
+          let jaf = Parser.jaf Lexer.token lexbuf in
+          Declarations.resolve_types ctx jaf false;
+          TypeAnalysis.check_types ctx jaf;
+          []
+        with
+        | Parser.Error ->
+            let diag =
+              Lsp.Types.Diagnostic.create
+                ~range:(to_lsp_range (lexbuf.lex_start_p, lexbuf.lex_curr_p))
+                ~message:"Syntax error." ()
+            in
+            [ diag ]
+        | CompileError.CompileError (msg, node) ->
+            let diag =
+              Lsp.Types.Diagnostic.create
+                ~range:(Jaf.ast_node_pos node |> to_lsp_range)
+                ~message:msg ()
+            in
+            [ diag ]
+        | CompileError.Undefined_variable (name, node) ->
+            let diag =
+              Lsp.Types.Diagnostic.create
+                ~range:(Jaf.ast_node_pos node |> to_lsp_range)
+                ~message:("Undefined variable: " ^ name)
+                ()
+            in
+            [ diag ]
       in
       notify_back#send_diagnostic diagnostics
 
