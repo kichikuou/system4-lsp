@@ -11,6 +11,14 @@ let log_info notify_back msg =
 let log_error notify_back msg =
   send_log_msg notify_back Lsp.Types.MessageType.Error msg
 
+let to_lsp_position p =
+  Lsp.Types.Position.create ~line:(p.Lexing.pos_lnum - 1)
+    ~character:(p.Lexing.pos_cnum - p.Lexing.pos_bol)
+
+let to_lsp_range start end_ =
+  Lsp.Types.Range.create ~start:(to_lsp_position start)
+    ~end_:(to_lsp_position end_)
+
 class lsp_server =
   object (self)
     inherit Linol_lwt.Jsonrpc2.server as super
@@ -27,19 +35,36 @@ class lsp_server =
 
     method spawn_query_handler f = Linol_lwt.spawn f
 
+    method private _on_doc ~(notify_back : Linol_lwt.Jsonrpc2.notify_back)
+        (uri : Lsp.Types.DocumentUri.t) (contents : string) =
+      let lexbuf = Lexing.from_string contents in
+      Lexing.set_filename lexbuf (Lsp.Types.DocumentUri.to_path uri);
+      let diagnostics =
+        try
+          let _ = Parser.jaf Lexer.token lexbuf in
+          []
+        with Parser.Error ->
+          let diag =
+            Lsp.Types.Diagnostic.create
+              ~range:(to_lsp_range lexbuf.lex_start_p lexbuf.lex_curr_p)
+              ~message:"Syntax error." ()
+          in
+          [ diag ]
+      in
+      notify_back#send_diagnostic diagnostics
+
     method! on_req_initialize ~notify_back i =
       (match i.rootPath with
       | Some (Some path) -> self#load_workspace ~notify_back path
       | _ -> ());
       super#on_req_initialize ~notify_back i
 
-    method on_notif_doc_did_open ~notify_back:_ _d ~content:_ : unit Linol_lwt.t
-        =
-      Linol_lwt.return ()
+    method on_notif_doc_did_open ~notify_back d ~content : unit Linol_lwt.t =
+      self#_on_doc ~notify_back d.uri content
 
-    method on_notif_doc_did_change ~notify_back:_ _d _c ~old_content:_old
-        ~new_content:_ =
-      Linol_lwt.return ()
+    method on_notif_doc_did_change ~notify_back d _c ~old_content:_old
+        ~new_content =
+      self#_on_doc ~notify_back d.uri new_content
 
     method on_notif_doc_did_close ~notify_back:_ _d : unit Linol_lwt.t =
       Linol_lwt.return ()
