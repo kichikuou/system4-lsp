@@ -163,6 +163,7 @@ and ast_statement =
   | ObjSwap        of expression      * expression
 and variable = {
   name      : string;
+  location  : Lexing.position * Lexing.position;
   array_dim : expression list;
   type_spec : type_specifier;
   initval   : expression option;
@@ -171,6 +172,7 @@ and variable = {
 
 type fundecl = {
   mutable name : string;
+  loc: Lexing.position * Lexing.position;
   struct_name : string option;
   return : type_specifier;
   params : variable list;
@@ -191,13 +193,15 @@ type struct_declaration =
   | Method of fundecl
 
 type structdecl = {
-  name : string;
+  name     : string;
+  loc      : Lexing.position * Lexing.position;
   is_class : bool;
-  decls : struct_declaration list
+  decls    : struct_declaration list
 }
 
 type enumdecl = {
   name   : string option;
+  loc    : Lexing.position * Lexing.position;
   values : (string * expression option) list
 }
 
