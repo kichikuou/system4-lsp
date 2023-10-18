@@ -30,6 +30,7 @@ module Type : sig
     | IFaceWrap of int
     | Function of int
     | Method of int
+    | NullType
   and t = { data : data; is_ref : bool; }
   val equal : t -> t -> bool
   val data_to_string : data -> string

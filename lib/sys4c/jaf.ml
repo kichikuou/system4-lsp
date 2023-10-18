@@ -136,6 +136,7 @@ and ast_expression =
   | Call        of expression * expression list * call_type option
   | New         of data_type  * expression list * int option
   | This
+  | Null
 
 type statement = {
   mutable node : ast_statement;
@@ -398,6 +399,7 @@ class ivisitor ctx = object (self)
     | New (_, args, _) ->
         List.iter args ~f:self#visit_expression
     | This -> ()
+    | Null -> ()
 
   method visit_statement (s : statement) =
     match s.node with
@@ -607,6 +609,8 @@ let rec expr_to_string (e : expression) =
       sprintf "new %s%s" (data_type_to_string t) (arglist_to_string args)
   | This ->
       "this"
+  | Null ->
+      "null"
 
 let rec stmt_to_string (stmt : statement) =
   match stmt.node with

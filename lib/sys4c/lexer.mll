@@ -96,6 +96,7 @@ let () =
               "continue",     CONTINUE;
               "break",        BREAK;
               "return",       RETURN;
+              "NULL",         NULL;
               "this",         THIS;
               "new",          NEW;
               "const",        CONST;

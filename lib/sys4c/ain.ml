@@ -28,6 +28,7 @@ module Type = struct
     (* internal compiler use *)
     | Function of int
     | Method of int
+    | NullType
   and t = {
     data : data;
     is_ref : bool;
@@ -77,6 +78,7 @@ module Type = struct
             | IFaceWrap (_) -> failwith "tried to create ref array<iface_wrap<...>>"
             | Function (_) -> failwith "tried to create ref array<function>"
             | Method (_) -> failwith "tried to create ref array<method>"
+            | NullType -> failwith "tried to create ref array<null>"
             end
       | Wrap (_) -> failwith "tried to create ref wrap<...>"
       | Option (_) -> failwith "tried to create ref option<...>"
@@ -89,6 +91,7 @@ module Type = struct
       | IFaceWrap (_) -> failwith "tried to create ref iface_wrap<...>"
       | Function (_) -> failwith "tried to create ref function"
       | Method (_) -> failwith "tried to create ref method"
+      | NullType -> failwith "tried to create ref null"
     else
       match o.data with
         | Void -> 0
@@ -132,6 +135,7 @@ module Type = struct
               | IFaceWrap (_) -> failwith "tried to create array<iface_wrap<...>>"
               | Function (_) -> failwith "tried to create array<function>"
               | Method (_) -> failwith "tried to create array<method>"
+              | NullType -> failwith "tried to create array<null>"
               end
         | Wrap (_) -> 82
         | Option (_) -> 86
@@ -144,6 +148,7 @@ module Type = struct
         | IFaceWrap (_) -> 100
         | Function (_) -> failwith "tried to create function"
         | Method (_) -> failwith "tried to create method"
+        | NullType -> failwith "tried to create null"
 
   let rec int_of_struct_type ?(var = false) version o =
     match o.data with
@@ -261,6 +266,7 @@ module Type = struct
       | HLLParam    -> begin match b with HLLParam    -> true | _ -> false end
       | HLLFunc     -> begin match b with HLLFunc     -> true | _ -> false end
       | Unknown98   -> begin match b with Unknown98   -> true | _ -> false end
+      | NullType    -> begin match b with NullType    -> true | _ -> false end
       | Struct i_a ->
           begin match b with
           | Struct i_b -> i_a = i_b
@@ -354,6 +360,7 @@ module Type = struct
     | IFaceWrap (no) -> sprintf "interface_wrap<%d>" no (* FIXME: look up name in ain object *)
     | Function (no) -> if no >= 0 then sprintf "function<%d>" no else "function"
     | Method (no) -> if no >= 0 then sprintf "method<%d>" no else "method"
+    | NullType -> "null"
   and to_string o =
     let prefix = if o.is_ref then "ref " else "" in
     prefix ^ (data_to_string o.data)

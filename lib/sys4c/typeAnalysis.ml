@@ -30,6 +30,8 @@ let rec type_equal (expected:Ain.Type.data) (actual:Ain.Type.data) =
   | (IMainSystem, IMainSystem) -> true
   | (FuncType a, FuncType b) -> a = b
   | (Delegate a, Delegate b) -> a = b
+  | ((FuncType _|Delegate _|IMainSystem), NullType) -> true
+  | (NullType, (FuncType _|Delegate _|IMainSystem|NullType)) -> true
   | (HLLFunc2, HLLFunc2) -> true
   | (HLLParam, HLLParam) -> true
   | (Array a, Array b) -> type_equal a.data b.data
@@ -66,7 +68,8 @@ let rec type_equal (expected:Ain.Type.data) (actual:Ain.Type.data) =
   | (Unknown98, _)
   | (IFaceWrap _, _)
   | (Function _, _)
-  | (Method _, _) -> false
+  | (Method _, _)
+  | (NullType, _) -> false
 
 let type_castable (dst:data_type) (src:Ain.Type.data) =
   match (dst, src) with
@@ -438,12 +441,15 @@ class type_analyze_visitor ctx = object (self)
         | _ -> data_type_error (Struct (-1)) None (ASTExpression expr)
         end
     | This ->
-        match environment#current_class with
+        begin match environment#current_class with
         | Some i ->
             expr.valuetype <- Some (Ain.Type.make (Struct i))
         | None ->
             (* TODO: separate error type for this? *)
             undefined_variable_error "this" (ASTExpression expr)
+        end
+    | Null ->
+        expr.valuetype <- Some (Ain.Type.make NullType)
 
   method! visit_statement stmt =
     (* rewrite character constants at statement-level as messages *)
