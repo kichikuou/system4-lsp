@@ -37,6 +37,14 @@ let to_lsp_range lexbuf (start, end_) =
     ~start:(to_lsp_position lexbuf start)
     ~end_:(to_lsp_position lexbuf end_)
 
+let make_diagnostic lexbuf node_opt message =
+  let range =
+    match node_opt with
+    | Some node -> Jaf.ast_node_pos node |> to_lsp_range lexbuf
+    | None -> to_lsp_range lexbuf (lexbuf.lex_start_p, lexbuf.lex_curr_p)
+  in
+  Lsp.Types.Diagnostic.create ~range ~message ()
+
 let predefined_constants =
   [
     Jaf.
@@ -79,7 +87,7 @@ class lsp_server =
         (uri : Lsp.Types.DocumentUri.t) (contents : string) =
       let lexbuf = Lexing.from_string contents in
       Lexing.set_filename lexbuf (Lsp.Types.DocumentUri.to_path uri);
-      let diagnostics =
+      let diagnostic =
         try
           let ctx =
             Jaf.
@@ -92,33 +100,31 @@ class lsp_server =
           let jaf = Parser.jaf Lexer.token lexbuf in
           Declarations.resolve_types ctx jaf false;
           TypeAnalysis.check_types ctx jaf;
-          []
+          None
         with
-        | Parser.Error ->
-            let diag =
-              Lsp.Types.Diagnostic.create
-                ~range:
-                  (to_lsp_range lexbuf (lexbuf.lex_start_p, lexbuf.lex_curr_p))
-                ~message:"Syntax error." ()
-            in
-            [ diag ]
+        | Parser.Error -> Some (make_diagnostic lexbuf None "Syntax error.")
         | CompileError.CompileError (msg, node) ->
-            let diag =
-              Lsp.Types.Diagnostic.create
-                ~range:(Jaf.ast_node_pos node |> to_lsp_range lexbuf)
-                ~message:msg ()
-            in
-            [ diag ]
+            Some (make_diagnostic lexbuf (Some node) msg)
         | CompileError.Undefined_variable (name, node) ->
-            let diag =
-              Lsp.Types.Diagnostic.create
-                ~range:(Jaf.ast_node_pos node |> to_lsp_range lexbuf)
-                ~message:("Undefined variable: " ^ name)
-                ()
+            Some
+              (make_diagnostic lexbuf (Some node)
+                 ("Undefined variable: " ^ name))
+        | CompileError.Type_error (expected, actual_opt, node) ->
+            let actual =
+              match actual_opt with
+              | Some actual -> (
+                  match actual.valuetype with
+                  | Some t -> "\n Actual type: " ^ Ain.Type.to_string t
+                  | None -> "")
+              | None -> ""
             in
-            [ diag ]
+            Some
+              (make_diagnostic lexbuf (Some node)
+                 ("Type error.\n Expected type: "
+                 ^ Ain.Type.to_string expected
+                 ^ actual))
       in
-      notify_back#send_diagnostic diagnostics
+      notify_back#send_diagnostic (Option.to_list diagnostic)
 
     method! on_req_initialize ~notify_back i =
       (match i.rootPath with
