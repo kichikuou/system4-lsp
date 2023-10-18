@@ -705,9 +705,8 @@ let read_cstring buf =
   | Some i ->
       let len = i - buf.pos in
       let cstr = Stdlib.Bytes.to_string (Stdlib.Bytes.sub buf.data buf.pos len) in
-      (* TODO: convert to UTF-8? *)
       buf.pos <- buf.pos + (len + 1);
-      cstr
+      UtfSjis.sjis2utf cstr
   | None ->
       failwith "unterminated string"
 
