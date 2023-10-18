@@ -349,7 +349,7 @@ class type_analyze_visitor ctx = object (self)
             undefined_variable_error (lib_name ^ "." ^ fun_name) (ASTExpression(expr))
         end
     (* built-in methods *)
-    | Member ({valuetype=Some{data=(Int|Float|String|Delegate _) as t; _}; _} as e, name, _) ->
+    | Member ({valuetype=Some{data=(Int|Float|String|Array _|Delegate _) as t; _}; _} as e, name, _) ->
         begin match Bytecode.builtin_of_string t name with
         | Some builtin ->
             expr.node <- Member (e, name, Some (BuiltinMethod builtin));
