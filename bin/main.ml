@@ -123,6 +123,17 @@ class lsp_server =
                  ("Type error.\n Expected type: "
                  ^ Ain.Type.to_string expected
                  ^ actual))
+        | CompileError.Arity_error (func, args, node) ->
+            Some
+              (make_diagnostic lexbuf (Some node)
+                 (Printf.sprintf
+                    "Arity error. '%s' expects %d arguments, but %d provided."
+                    func.name func.nr_args (List.length args)))
+        | e ->
+            log_error notify_back
+              (Exn.to_string e ^ "\n"
+              ^ Backtrace.to_string (Backtrace.Exn.most_recent ()));
+            None
       in
       notify_back#send_diagnostic (Option.to_list diagnostic)
 
