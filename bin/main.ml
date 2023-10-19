@@ -126,6 +126,14 @@ class lsp_server =
       in
       notify_back#send_diagnostic (Option.to_list diagnostic)
 
+    (* Do not use incremental update, to work around a bug in lsp 1.14 where its
+       content change application logic is confused when the newline code is CRLF. *)
+    method! config_sync_opts =
+      {
+        (super#config_sync_opts) with
+        change = Some Lsp.Types.TextDocumentSyncKind.Full;
+      }
+
     method! on_req_initialize ~notify_back i =
       (match i.rootPath with
       | Some (Some path) -> self#load_workspace ~notify_back path
