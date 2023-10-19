@@ -111,6 +111,14 @@ let type_coerce_numerics parent a b =
 
 class type_analyze_visitor ctx = object (self)
   inherit ivisitor ctx as super
+  val mutable errors : exn list = []
+  method errors = List.rev errors
+
+  method catch_errors f =
+    try
+      f ()
+    with exn ->
+      errors <- exn :: errors
 
   (* an lvalue is an expression which denotes a location that can be assigned to/referenced *)
   method check_lvalue (e:expression) (parent:ast_node) =
@@ -466,69 +474,70 @@ class type_analyze_visitor ctx = object (self)
         stmt.node <- MessageCall msg
     | _ -> ()
     end;
-    super#visit_statement stmt;
-    begin match stmt.node with
-    | EmptyStatement -> ()
-    | Declarations (_) -> ()
-    | Expression (_) -> ()
-    | Compound (_) -> ()
-    | Labeled (_, _) -> ()
-    | If (test, _, _) | While (test, _) | DoWhile (test, _) ->
-        type_check (ASTStatement (stmt)) Int test
-    | For (_, Some test, _, _) ->
-        type_check (ASTStatement (stmt)) Int test
-    | For (_, None, _, _) -> ()
-    | Goto (_) -> ()
-    | Continue -> ()
-    | Break -> ()
-    | Switch (expr, _) ->
-        (* TODO: string switch *)
-        type_check (ASTStatement (stmt)) Int expr
-    | Case (expr, _) ->
-        (* TODO: string switch *)
-        type_check (ASTStatement (stmt)) Int expr
-    | Default (_) -> ()
-    | Return (Some e) ->
-        begin match environment#current_function with
-        | None -> compiler_bug "return statement outside of function" (Some(ASTStatement stmt))
-        | Some f -> type_check (ASTStatement stmt) (jaf_to_ain_data_type f.return.data) e
-        end
-    | Return (None) ->
-        begin match environment#current_function with
-        | None -> compiler_bug "return statement outside of function" (Some(ASTStatement stmt))
-        | Some f ->
-            begin match f.return.data with
-            | Void -> ()
-            | _ -> data_type_error (jaf_to_ain_data_type f.return.data) None (ASTStatement stmt)
-            end
-        end
-    | MessageCall _ -> ()
-    | RefAssign (lhs, rhs) ->
-        (* rhs must be an lvalue in order to create a reference to it *)
-        self#check_lvalue rhs (ASTStatement stmt);
-        (* check that lhs is a reference variable of the appropriate type *)
-        begin match lhs.node with
-        | Ident (name, _) ->
-            begin match environment#get_local name with
-            | Some v ->
-                begin match v.type_spec.qualifier with
-                | Some Ref ->
-                    type_check (ASTStatement stmt) (Option.value_exn lhs.valuetype).data rhs
-                | _ ->
-                    ref_type_error (Option.value_exn rhs.valuetype).data (Some lhs) (ASTStatement stmt)
-                end
-            | None ->
-                undefined_variable_error name (ASTStatement stmt)
-            end
-        | _ ->
-            (* FIXME? this isn't really a _type_ error *)
-            ref_type_error (Option.value_exn rhs.valuetype).data (Some lhs) (ASTStatement stmt)
-        end
-    | ObjSwap (lhs, rhs) ->
-        self#check_lvalue lhs (ASTStatement stmt);
-        self#check_lvalue rhs (ASTStatement stmt);
-        type_check (ASTStatement stmt) (Option.value_exn lhs.valuetype).data rhs
-    end
+    self#catch_errors (fun () ->
+      super#visit_statement stmt;
+      begin match stmt.node with
+      | EmptyStatement -> ()
+      | Declarations (_) -> ()
+      | Expression (_) -> ()
+      | Compound (_) -> ()
+      | Labeled (_, _) -> ()
+      | If (test, _, _) | While (test, _) | DoWhile (test, _) ->
+          type_check (ASTStatement (stmt)) Int test
+      | For (_, Some test, _, _) ->
+          type_check (ASTStatement (stmt)) Int test
+      | For (_, None, _, _) -> ()
+      | Goto (_) -> ()
+      | Continue -> ()
+      | Break -> ()
+      | Switch (expr, _) ->
+          (* TODO: string switch *)
+          type_check (ASTStatement (stmt)) Int expr
+      | Case (expr, _) ->
+          (* TODO: string switch *)
+          type_check (ASTStatement (stmt)) Int expr
+      | Default (_) -> ()
+      | Return (Some e) ->
+          begin match environment#current_function with
+          | None -> compiler_bug "return statement outside of function" (Some(ASTStatement stmt))
+          | Some f -> type_check (ASTStatement stmt) (jaf_to_ain_data_type f.return.data) e
+          end
+      | Return (None) ->
+          begin match environment#current_function with
+          | None -> compiler_bug "return statement outside of function" (Some(ASTStatement stmt))
+          | Some f ->
+              begin match f.return.data with
+              | Void -> ()
+              | _ -> data_type_error (jaf_to_ain_data_type f.return.data) None (ASTStatement stmt)
+              end
+          end
+      | MessageCall _ -> ()
+      | RefAssign (lhs, rhs) ->
+          (* rhs must be an lvalue in order to create a reference to it *)
+          self#check_lvalue rhs (ASTStatement stmt);
+          (* check that lhs is a reference variable of the appropriate type *)
+          begin match lhs.node with
+          | Ident (name, _) ->
+              begin match environment#get_local name with
+              | Some v ->
+                  begin match v.type_spec.qualifier with
+                  | Some Ref ->
+                      type_check (ASTStatement stmt) (Option.value_exn lhs.valuetype).data rhs
+                  | _ ->
+                      ref_type_error (Option.value_exn rhs.valuetype).data (Some lhs) (ASTStatement stmt)
+                  end
+              | None ->
+                  undefined_variable_error name (ASTStatement stmt)
+              end
+          | _ ->
+              (* FIXME? this isn't really a _type_ error *)
+              ref_type_error (Option.value_exn rhs.valuetype).data (Some lhs) (ASTStatement stmt)
+          end
+      | ObjSwap (lhs, rhs) ->
+          self#check_lvalue lhs (ASTStatement stmt);
+          self#check_lvalue rhs (ASTStatement stmt);
+          type_check (ASTStatement stmt) (Option.value_exn lhs.valuetype).data rhs
+      end)
 
   method visit_variable var =
     let rec calculate_array_rank (t:type_specifier) =
@@ -566,11 +575,12 @@ class type_analyze_visitor ctx = object (self)
     self#visit_variable var
 
   method! visit_declaration decl =
-    super#visit_declaration decl;
-    begin match decl with
-    | Global g -> self#visit_variable g
-    | _ -> ()
-    end
+    self#catch_errors (fun () ->
+      super#visit_declaration decl;
+      begin match decl with
+      | Global g -> self#visit_variable g
+      | _ -> ()
+      end)
 
   method! visit_fundecl f =
     (* Equality function for function declarations. Two function declarations
@@ -633,4 +643,6 @@ class type_analyze_visitor ctx = object (self)
 end
 
 let check_types ctx decls =
-  (new type_analyze_visitor ctx)#visit_toplevel decls
+  let visitor = new type_analyze_visitor ctx in
+  visitor#visit_toplevel decls;
+  visitor#errors

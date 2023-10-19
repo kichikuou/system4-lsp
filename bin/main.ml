@@ -87,7 +87,7 @@ class lsp_server =
         (uri : Lsp.Types.DocumentUri.t) (contents : string) =
       let lexbuf = Lexing.from_string contents in
       Lexing.set_filename lexbuf (Lsp.Types.DocumentUri.to_path uri);
-      let diagnostic =
+      let errors =
         try
           let ctx =
             Jaf.
@@ -99,9 +99,14 @@ class lsp_server =
           in
           let jaf = Parser.jaf Lexer.token lexbuf in
           Declarations.resolve_types ctx jaf false;
-          TypeAnalysis.check_types ctx jaf;
-          None
-        with
+          TypeAnalysis.check_types ctx jaf
+        with e -> [ e ]
+      in
+      notify_back#send_diagnostic
+        (self#handle_errors ~notify_back ~lexbuf errors)
+
+    method private handle_errors ~notify_back ~lexbuf errors =
+      List.filter_map errors ~f:(function
         | Parser.Error -> Some (make_diagnostic lexbuf None "Syntax error.")
         | CompileError.CompileError (msg, node) ->
             Some (make_diagnostic lexbuf (Some node) msg)
@@ -133,9 +138,7 @@ class lsp_server =
             log_error notify_back
               (Exn.to_string e ^ "\n"
               ^ Backtrace.to_string (Backtrace.Exn.most_recent ()));
-            None
-      in
-      notify_back#send_diagnostic (Option.to_list diagnostic)
+            None)
 
     (* Do not use incremental update, to work around a bug in lsp 1.14 where its
        content change application logic is confused when the newline code is CRLF. *)
