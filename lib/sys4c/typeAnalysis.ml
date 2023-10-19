@@ -98,6 +98,17 @@ let type_check_struct parent actual =
   | Some _ -> data_type_error (Struct 0) (Some actual) parent
   | None -> compiler_bug "tried to type check untyped expression" (Some parent)
 
+let type_coerce_numerics parent a b =
+  type_check_numeric parent a;
+  type_check_numeric parent b;
+  match ((Option.value_exn a.valuetype).data, (Option.value_exn b.valuetype).data) with
+  | (Float, _) -> a.valuetype
+  | (_, Float) -> b.valuetype
+  | (Int, _) -> a.valuetype
+  | (_, Int) -> b.valuetype
+  | (Bool, Bool) -> a.valuetype
+  | _ -> compiler_bug "coerce_numerics: non-numeric type" (Some parent)
+
 class type_analyze_visitor ctx = object (self)
   inherit ivisitor ctx as super
 
@@ -147,6 +158,8 @@ class type_analyze_visitor ctx = object (self)
         end
     | Ain.Type.Delegate (dg_i) ->
         self#check_delegate_compatible parent dg_i rhs
+    | Ain.Type.Int | Ain.Type.Bool | Ain.Type.Float ->
+        type_check_numeric parent rhs
     | _ ->
         type_check parent t rhs
 
@@ -155,6 +168,7 @@ class type_analyze_visitor ctx = object (self)
     (* convenience functions which always pass parent expression *)
     let check = type_check (ASTExpression expr) in
     let check_numeric = type_check_numeric (ASTExpression expr) in
+    let coerce_numerics = type_coerce_numerics (ASTExpression expr) in
     let check_struct = type_check_struct (ASTExpression expr) in
     let check_expr a b = check (Option.value_exn a.valuetype).data b in
     (* check function call arguments *)
@@ -226,20 +240,13 @@ class type_analyze_visitor ctx = object (self)
         | Plus ->
             begin match (Option.value_exn a.valuetype).data with
             | String ->
-                check String b
+                check String b;
+                expr.valuetype <- a.valuetype
             | _ ->
-                check_numeric a;
-                check_numeric b;
-                (* TODO: allow coercion *)
-                check_expr a b;
+                expr.valuetype <- coerce_numerics a b
             end;
-            expr.valuetype <- a.valuetype
         | Minus | Times | Divide ->
-            check_numeric a;
-            check_numeric b;
-            (* TODO: allow coercion *)
-            check_expr a b;
-            expr.valuetype <- a.valuetype
+            expr.valuetype <- coerce_numerics a b
         | LogOr | LogAnd | BitOr | BitXor | BitAnd | LShift | RShift ->
             check Int a;
             check Int b;
@@ -265,8 +272,6 @@ class type_analyze_visitor ctx = object (self)
             | _ ->
                 check_numeric a;
                 check_numeric b;
-                (* TODO: allow coercion *)
-                check_expr a b
             end;
             expr.valuetype <- Some (Ain.Type.make Int)
         | RefEqual | RefNEqual ->
@@ -292,8 +297,6 @@ class type_analyze_visitor ctx = object (self)
         | (_, (PlusAssign | MinusAssign | TimesAssign | DivideAssign)) ->
             check_numeric lhs;
             check_numeric rhs;
-            (* TODO: allow coercion *)
-            check_expr lhs rhs
         | (_, (ModuloAssign | OrAssign | XorAssign | AndAssign | LShiftAssign | RShiftAssign)) ->
             check Int lhs;
             check Int rhs
