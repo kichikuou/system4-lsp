@@ -26,7 +26,7 @@ let rec type_equal (expected:Ain.Type.data) (actual:Ain.Type.data) =
   | (LongInt, (Int|Bool|LongInt)) -> true
   | (Float, Float) -> true
   | (String, String) -> true
-  | (Struct a, Struct b) -> a = b
+  | (Struct a, Struct b) -> a = -1 || a = b
   | (IMainSystem, IMainSystem) -> true
   | (FuncType a, FuncType b) -> a = b
   | (Delegate a, Delegate b) -> a = b
