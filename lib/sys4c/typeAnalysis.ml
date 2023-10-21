@@ -204,8 +204,13 @@ class type_analyze_visitor ctx = object (self)
       if not (nr_params = (List.length args)) then
         arity_error f args (ASTExpression expr)
       else if nr_params > 0 then begin
-        let check_arg a (v:Ain.Variable.t) = check v.value_type.data a in
-        List.iter2_exn args params ~f:check_arg
+        let check_arg (v:Ain.Variable.t) a =
+            (* NULL can be passed to ref parameters *)
+            match v.value_type, Option.value_exn a.valuetype with
+            | { is_ref=true; _ }, { data=NullType; _ } -> ()
+            | { data; _ }, _ -> check data a
+        in
+        List.iter2_exn params args ~f:check_arg
       end
     in
     let set_valuetype spec =
@@ -545,6 +550,7 @@ class type_analyze_visitor ctx = object (self)
           begin match environment#current_function with
           | None -> compiler_bug "return statement outside of function" (Some(ASTStatement stmt))
           | Some f ->
+              (* ref-type functions can return NULL *)
               begin match f.return.qualifier, Option.value_exn e.valuetype with
               | Some Ref, { data=NullType; _ } -> ()
               | _, _ -> type_check (ASTStatement stmt) (jaf_to_ain_data_type f.return.data) e
