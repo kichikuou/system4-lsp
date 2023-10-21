@@ -285,10 +285,15 @@ class type_analyze_visitor ctx = object (self)
             end;
             expr.valuetype <- a.valuetype
         | Equal | NEqual | LT | GT | LTE | GTE ->
-            begin match (Option.value_exn a.valuetype).data with
-            | String ->
+            begin match op, (Option.value_exn a.valuetype).data with
+            | _, String ->
                 check String b
-            | _ ->
+            | (Equal | NEqual), (FuncType _ | NullType) ->
+                begin match (Option.value_exn b.valuetype).data with
+                | FuncType _ | NullType -> ()
+                | _ -> data_type_error (Option.value_exn a.valuetype).data (Some b) (ASTExpression expr)
+                end
+            | _, _ ->
                 check_numeric a;
                 check_numeric b;
             end;
