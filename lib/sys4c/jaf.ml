@@ -77,6 +77,7 @@ and data_type =
   | Unresolved of string
   | Void
   | Int
+  | LongInt
   | Bool
   | Float
   | String
@@ -554,6 +555,7 @@ let rec data_type_to_string = function
   | Unresolved s -> "Unresolved<" ^ s ^ ">"
   | Void -> "void"
   | Int -> "int"
+  | LongInt -> "lint"
   | Bool -> "bool"
   | Float -> "float"
   | String -> "string"
@@ -765,6 +767,7 @@ let rec jaf_to_ain_data_type data =
   | Unresolved _ -> failwith "tried to convert Unresolved to ain data type"
   | Void -> Ain.Type.Void
   | Int -> Ain.Type.Int
+  | LongInt -> Ain.Type.LongInt
   | Bool -> Ain.Type.Bool
   | Float -> Ain.Type.Float
   | String -> Ain.Type.String

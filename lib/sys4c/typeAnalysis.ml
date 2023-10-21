@@ -75,7 +75,7 @@ let type_castable (dst:data_type) (src:Ain.Type.data) =
   match (dst, src) with
   (* FIXME: cast to void should be allowed *)
   | (Void, _) -> compiler_bug "type checker cast to void type" None
-  | ((Int|Bool|Float), (Int|Bool|Float)) -> true
+  | ((Int|LongInt|Bool|Float), (Int|LongInt|Bool|Float)) -> true
   | _ -> false
 
 let type_check parent expected actual =
@@ -88,7 +88,7 @@ let type_check parent expected actual =
 
 let type_check_numeric parent actual =
   match actual.valuetype with
-  | Some {data=(Int|Bool|Float); _} -> ()
+  | Some {data=(Int|Bool|LongInt|Float); _} -> ()
   | Some _ -> data_type_error Int (Some actual) parent
   | None -> compiler_bug "tried to type check untyped expression" (Some parent)
 
@@ -104,6 +104,8 @@ let type_coerce_numerics parent a b =
   match ((Option.value_exn a.valuetype).data, (Option.value_exn b.valuetype).data) with
   | (Float, _) -> a.valuetype
   | (_, Float) -> b.valuetype
+  | (LongInt, _) -> a.valuetype
+  | (_, LongInt) -> b.valuetype
   | (Int, _) -> a.valuetype
   | (_, Int) -> b.valuetype
   | (Bool, Bool) -> a.valuetype
@@ -166,7 +168,7 @@ class type_analyze_visitor ctx = object (self)
         end
     | Ain.Type.Delegate (dg_i) ->
         self#check_delegate_compatible parent dg_i rhs
-    | Ain.Type.Int | Ain.Type.Bool | Ain.Type.Float ->
+    | Ain.Type.Int | Ain.Type.LongInt | Ain.Type.Bool | Ain.Type.Float ->
         type_check_numeric parent rhs
     | _ ->
         type_check parent t rhs

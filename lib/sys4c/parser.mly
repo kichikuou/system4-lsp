@@ -260,7 +260,7 @@ atomic_type_specifier
   : VOID         { Void }
   | CHAR         { Int }
   | INT          { Int }
-  | LINT         { Int }
+  | LINT         { LongInt }
   | FLOAT        { Float }
   | BOOL         { Bool }
   | STRING       { String }
