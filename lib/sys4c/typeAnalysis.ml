@@ -157,14 +157,23 @@ class type_analyze_visitor ctx = object (self)
      * functype of the variable (if the prototypes match).
      *)
     | Ain.Type.FuncType (ft_i) ->
+        (* XXX: ft_i may be -1 if it's read from ain. We don't check
+                function type compatibility in that case. *)
         begin match (Option.value_exn rhs.valuetype) with
         | { data=Ain.Type.Function (f_i); is_ref=true } ->
-            let ft = Ain.get_functype_by_index ctx.ain ft_i in
-            let f = Ain.get_function_by_index ctx.ain f_i in
-            if not (Ain.FunctionType.function_compatible ft f) then
-              data_type_error (Ain.Type.FuncType (ft_i)) (Some rhs) parent
+            if ft_i >= 0 then
+                let ft = Ain.get_functype_by_index ctx.ain ft_i in
+                let f = Ain.get_function_by_index ctx.ain f_i in
+                if not (Ain.FunctionType.function_compatible ft f) then
+                data_type_error (Ain.Type.FuncType (ft_i)) (Some rhs) parent
+        | { data=Ain.Type.FuncType (ft_i'); _ } ->
+            if ft_i >= 0 && ft_i <> ft_i' then
+            data_type_error (Ain.Type.FuncType (ft_i)) (Some rhs) parent
+        | { data=Ain.Type.String; _ }
+        | { data=Ain.Type.NullType; _ } ->
+            ()
         | _ ->
-            ref_type_error (Ain.Type.Function (-1)) (Some rhs) parent
+            data_type_error (Ain.Type.FuncType (ft_i)) (Some rhs) parent
         end
     | Ain.Type.Delegate (dg_i) ->
         self#check_delegate_compatible parent dg_i rhs
