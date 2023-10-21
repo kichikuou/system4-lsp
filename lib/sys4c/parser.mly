@@ -81,7 +81,7 @@ let member_func loc typespec_opt struct_name is_dtor name params body =
 %token IMAINSYSTEM
 /* keywords */
 %token IF ELSE WHILE DO FOR SWITCH CASE DEFAULT NULL THIS NEW
-%token GOTO CONTINUE BREAK RETURN
+%token GOTO JUMP JUMPS CONTINUE BREAK RETURN
 %token CONST REF OVERRIDE ARRAY WRAP FUNCTYPE DELEGATE STRUCT CLASS PRIVATE PUBLIC ENUM
 
 %token EOF
@@ -354,6 +354,8 @@ iteration_statement
 
 jump_statement
   : GOTO IDENTIFIER SEMICOLON { Goto ($2) }
+  | JUMP IDENTIFIER SEMICOLON { Jump ($2) }
+  | JUMPS expression SEMICOLON { Jumps ($2) }
   | CONTINUE SEMICOLON { Continue }
   | BREAK SEMICOLON { Break }
   | RETURN expression? SEMICOLON { Return ($2) }

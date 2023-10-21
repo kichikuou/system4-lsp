@@ -153,6 +153,8 @@ and ast_statement =
   | DoWhile        of expression      * statement
   | For            of statement       * expression option * expression option * statement
   | Goto           of string
+  | Jump           of string
+  | Jumps          of expression
   | Continue
   | Break
   | Switch         of expression      * statement list
@@ -431,6 +433,9 @@ class ivisitor ctx = object (self)
         self#visit_statement body;
         environment#pop
     | Goto (_) -> ()
+    | Jump (_) -> ()
+    | Jumps (e) ->
+        self#visit_expression e
     | Continue -> ()
     | Break -> ()
     | Switch (e, stmts) ->
@@ -643,6 +648,10 @@ let rec stmt_to_string (stmt : statement) =
       sprintf "for (%s %s %s) %s" s_init s_test s_inc s_body
   | Goto (label) ->
       sprintf "goto %s;" label
+  | Jump (func) ->
+      sprintf "jump %s;" func
+  | Jumps (e) ->
+      sprintf "jumps %s;" (expr_to_string e)
   | Continue ->
       "continue;"
   | Break ->

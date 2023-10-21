@@ -488,6 +488,9 @@ class type_analyze_visitor ctx = object (self)
           type_check (ASTStatement (stmt)) Int test
       | For (_, None, _, _) -> ()
       | Goto (_) -> ()
+      | Jump (_) ->()
+      | Jumps (e) ->
+        type_check (ASTStatement stmt) String e
       | Continue -> ()
       | Break -> ()
       | Switch (expr, _) ->

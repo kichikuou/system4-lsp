@@ -93,6 +93,8 @@ let () =
               "case",         CASE;
               "default",      DEFAULT;
               "goto",         GOTO;
+              "jump",         JUMP;
+              "jumps",        JUMPS;
               "continue",     CONTINUE;
               "break",        BREAK;
               "return",       RETURN;
