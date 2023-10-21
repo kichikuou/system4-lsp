@@ -300,11 +300,12 @@ class type_analyze_visitor ctx = object (self)
             end;
             expr.valuetype <- Some (Ain.Type.make Int)
         | RefEqual | RefNEqual ->
-            begin match ((Option.value_exn a.valuetype).is_ref, (Option.value_exn b.valuetype).is_ref) with
-            | (true, true) ->
-                check_expr a b
-            | (false, _) -> ref_type_error Void (Some a) (ASTExpression expr)
-            | (_, false) -> ref_type_error Void (Some b) (ASTExpression expr)
+            begin match (Option.value_exn a.valuetype, Option.value_exn b.valuetype) with
+            | { data=NullType; _ }, _ -> () (* FIXME: check that rhs is a ref *)
+            | _, { data=NullType; _ } -> () (* FIXME: check that lhs is a ref *)
+            | { is_ref=true; _ }, { is_ref=true; _ } -> check_expr a b
+            | { is_ref=false; _ }, _ -> ref_type_error Void (Some a) (ASTExpression expr)
+            | _, { is_ref=false; _ } -> ref_type_error Void (Some b) (ASTExpression expr)
             end;
             expr.valuetype <- Some (Ain.Type.make Int)
         end;
