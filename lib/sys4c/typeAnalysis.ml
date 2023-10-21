@@ -448,9 +448,10 @@ class type_analyze_visitor ctx = object (self)
             | _ -> None)
         in
         let f = Bytecode.function_of_builtin builtin elem_t in
-        (* XXX: The argument of Array.Numof() is optional *)
-        begin match builtin, args with
-        | ArrayNumof, [] -> ()
+        (* XXX: Some arguments of Array methods are optional *)
+        begin match builtin, List.length args with
+        | ArrayNumof, 0 -> ()
+        | ArrayFind, 3 -> check_call { f with vars = List.take f.vars 3; nr_args = 3 } args
         | _, _ -> check_call f args
         end;
         expr.node <- Call (e, args, Some (BuiltinCall builtin));
