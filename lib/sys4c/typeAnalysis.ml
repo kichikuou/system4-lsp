@@ -75,7 +75,7 @@ let type_castable (dst:data_type) (src:Ain.Type.data) =
   match (dst, src) with
   (* FIXME: cast to void should be allowed *)
   | (Void, _) -> compiler_bug "type checker cast to void type" None
-  | ((Int|LongInt|Bool|Float), (Int|LongInt|Bool|Float)) -> true
+  | ((Int|LongInt|Bool|Float|String), (Int|LongInt|Bool|Float)) -> true
   | _ -> false
 
 let type_check parent expected actual =
