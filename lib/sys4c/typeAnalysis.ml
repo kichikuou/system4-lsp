@@ -136,6 +136,12 @@ class type_analyze_visitor ctx = object (self)
     | New (_, _, _) -> ()
     | _ -> not_an_lvalue_error e parent
 
+  method check_ref_or_lvalue (e:expression) (parent:ast_node) =
+    match Option.value_exn e.valuetype with
+    | { data=NullType; _ } -> ()
+    | { is_ref=true; _ } -> ()
+    | _ -> self#check_lvalue e parent
+
   method check_delegate_compatible parent dg_i expr =
     match (Option.value_exn expr.valuetype) with
     | { data=Ain.Type.Method (f_i); is_ref=true } ->
@@ -545,8 +551,8 @@ class type_analyze_visitor ctx = object (self)
           end
       | MessageCall _ -> ()
       | RefAssign (lhs, rhs) ->
-          (* rhs must be an lvalue in order to create a reference to it *)
-          self#check_lvalue rhs (ASTStatement stmt);
+          (* rhs must be a ref, or an lvalue in order to create a reference to it *)
+          self#check_ref_or_lvalue rhs (ASTStatement stmt);
           (* check that lhs is a reference variable of the appropriate type *)
           begin match lhs.node with
           | Ident (name, _) ->
@@ -595,7 +601,7 @@ class type_analyze_visitor ctx = object (self)
     | Some expr ->
         begin match var.type_spec.qualifier with
         | Some Ref ->
-            self#check_lvalue expr (ASTVariable var);
+            self#check_ref_or_lvalue expr (ASTVariable var);
             type_check (ASTVariable var) (jaf_to_ain_data_type var.type_spec.data) expr
         | _ ->
             self#check_assign (ASTVariable var) (jaf_to_ain_data_type var.type_spec.data) expr
