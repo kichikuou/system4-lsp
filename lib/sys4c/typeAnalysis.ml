@@ -568,7 +568,8 @@ class type_analyze_visitor ctx = object (self)
     | Some expr ->
         begin match var.type_spec.qualifier with
         | Some Ref ->
-            compile_error "Initial value for ref type not implemented" (ASTVariable var);
+            self#check_lvalue expr (ASTVariable var);
+            type_check (ASTVariable var) (jaf_to_ain_data_type var.type_spec.data) expr
         | _ ->
             self#check_assign (ASTVariable var) (jaf_to_ain_data_type var.type_spec.data) expr
         end
