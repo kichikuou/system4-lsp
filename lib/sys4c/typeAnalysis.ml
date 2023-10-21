@@ -442,7 +442,11 @@ class type_analyze_visitor ctx = object (self)
             | _ -> None)
         in
         let f = Bytecode.function_of_builtin builtin elem_t in
-        check_call f args;
+        (* XXX: The argument of Array.Numof() is optional *)
+        begin match builtin, args with
+        | ArrayNumof, [] -> ()
+        | _, _ -> check_call f args
+        end;
         expr.node <- Call (e, args, Some (BuiltinCall builtin));
         expr.valuetype <- Some f.return_type
     (* functype/delegate call *)

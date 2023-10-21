@@ -1433,7 +1433,7 @@ let function_of_builtin builtin t_param =
   | ArrayAlloc       -> make_function t_void "Alloc" [t_int]
   | ArrayRealloc     -> make_function t_void "Realloc" [t_int]
   | ArrayFree        -> make_function t_void "Free" []
-  | ArrayNumof       -> make_function t_int "Numof" []
+  | ArrayNumof       -> make_function t_int "Numof" [t_int]
   | ArrayCopy        -> make_function t_int "Copy" [t_int; t_ref_array (Option.value_exn t_param); t_int; t_int]
   | ArrayFill        -> make_function t_int "Fill" [t_int; t_int; Option.value_exn t_param]
   | ArrayPushBack    -> make_function t_void "PushBack" [Option.value_exn t_param]
