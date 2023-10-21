@@ -20,7 +20,7 @@ open CompileError
 
 let rec type_equal (expected:Ain.Type.data) (actual:Ain.Type.data) =
   match (expected, actual) with
-  | (Void, _) -> true (* XXX: used for type-generic built-ins (e.g. Array.PushBack) *)
+  | (Void, Void) -> true
   | (Int, (Int|Bool|LongInt)) -> true
   | (Bool, (Int|Bool|LongInt)) -> true
   | (LongInt, (Int|Bool|LongInt)) -> true
@@ -46,6 +46,7 @@ let rec type_equal (expected:Ain.Type.data) (actual:Ain.Type.data) =
   | (IFaceWrap a, IFaceWrap b) -> a = b
   | (Function _, Function _) -> true
   | (Method _, Method _) -> true
+  | (Void, _)
   | (Int, _)
   | (Bool, _)
   | (LongInt, _)
@@ -431,12 +432,15 @@ class type_analyze_visitor ctx = object (self)
         expr.node <- Call (e, args, Some (SystemCall sys));
         expr.valuetype <- Some f.return_type
     (* built-in call *)
-    | Call ({node=Member(_, _, Some(BuiltinMethod builtin)); _} as e, args, _) ->
+    | Call ({node=Member(obj, _, Some(BuiltinMethod builtin)); _} as e, args, _) ->
         (* TODO: rewrite to HLL call for 11+ (?) *)
         if Ain.version_gte ctx.ain (11, 0) then
           compile_error "ain v11+ built-ins not implemented" (ASTExpression expr);
-        let f = Bytecode.function_of_builtin builtin in
-        (* TODO: properly check type-generic arguments based on object type *)
+        let elem_t = Option.(obj.valuetype >>= function
+            | { data=Array t; _ } -> Some t
+            | _ -> None)
+        in
+        let f = Bytecode.function_of_builtin builtin elem_t in
         check_call f args;
         expr.node <- Call (e, args, Some (BuiltinCall builtin));
         expr.valuetype <- Some f.return_type
