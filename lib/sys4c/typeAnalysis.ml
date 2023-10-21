@@ -240,6 +240,9 @@ class type_analyze_visitor ctx = object (self)
         | ResolvedSystem ->
             expr.node <- Ident ("system", Some System);
             expr.valuetype <- Some (Ain.Type.make Void)
+        | ResolvedBuiltin builtin ->
+            expr.node <- Ident (name, Some (BuiltinFunction builtin));
+            expr.valuetype <- Some (Ain.Type.make Void)
         | UnresolvedName ->
             undefined_variable_error name (ASTExpression expr)
         end
@@ -420,6 +423,12 @@ class type_analyze_visitor ctx = object (self)
         check_call f args;
         expr.node <- Call (e, args, Some (FunctionCall fno));
         expr.valuetype <- Some f.return_type
+    (* built-in function call *)
+    | Call ({node=Ident(_, Some (BuiltinFunction builtin)); _} as e, args, _) ->
+        let f = Bytecode.function_of_builtin builtin None in
+        check_call f args;
+        expr.node <- Call (e, args, Some (BuiltinCall builtin));
+        expr.valuetype <- Some f.return_type
     (* method call *)
     | Call ({node=Member(_, _, Some (ClassMethod(sno, mno))); _} as e, args, _) ->
         let f = Ain.get_function_by_index ctx.ain mno in
@@ -438,7 +447,7 @@ class type_analyze_visitor ctx = object (self)
         check_call f args;
         expr.node <- Call (e, args, Some (SystemCall sys));
         expr.valuetype <- Some f.return_type
-    (* built-in call *)
+    (* built-in method call *)
     | Call ({node=Member(obj, _, Some(BuiltinMethod builtin)); _} as e, args, _) ->
         (* TODO: rewrite to HLL call for 11+ (?) *)
         if Ain.version_gte ctx.ain (11, 0) then

@@ -1293,6 +1293,7 @@ let function_of_syscall sys =
   | CopySaveFile       -> make_function 0x1C t_int "CopySaveFile" [t_string; t_string]
 
 type builtin =
+  | Assert
   | IntString
   | FloatString
   | StringInt
@@ -1323,6 +1324,10 @@ type builtin =
   | DelegateExist
   | DelegateErase
   | DelegateClear
+
+let builtin_function_of_string = function
+  | "assert" -> Some Assert
+  | _ -> None
 
 let int_builtin_of_string = function
   | "String" -> Some IntString
@@ -1419,6 +1424,7 @@ let function_of_builtin builtin t_param =
     }
   in
   match builtin with
+  | Assert           -> make_function t_void "assert" [t_int]
   | IntString        -> make_function t_string "String" []
   | FloatString      -> make_function t_string "String" []
   | StringInt        -> make_function t_int "Int" []
