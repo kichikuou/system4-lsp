@@ -11,37 +11,14 @@ let log_info notify_back msg =
 let log_error notify_back msg =
   send_log_msg notify_back Lsp.Types.MessageType.Error msg
 
-(* LSP expects character offsets based on utf-16 representation. *)
-let count_utf16_code_units_of_utf8_bytes bytes start end_ =
-  let rec loop i n =
-    if i >= end_ then n
-    else
-      let ch = Bytes.get bytes i in
-      if Char.O.(ch <= '\x7f') then loop (i + 1) (n + 1)
-      else if Char.O.(ch <= '\xbf') then failwith "invalid utf-8 sequence"
-      else if Char.O.(ch <= '\xdf') then loop (i + 2) (n + 1)
-      else if Char.O.(ch <= '\xef') then loop (i + 3) (n + 1)
-      else if Char.O.(ch <= '\xf7') then loop (i + 4) (n + 2)
-      else failwith "invalid utf-8 sequence"
-  in
-  loop start 0
-
-let to_lsp_position (lexbuf : Lexing.lexbuf) p =
-  Lsp.Types.Position.create ~line:(p.Lexing.pos_lnum - 1)
-    ~character:
-      (count_utf16_code_units_of_utf8_bytes lexbuf.lex_buffer p.Lexing.pos_bol
-         p.Lexing.pos_cnum)
-
-let to_lsp_range lexbuf (start, end_) =
-  Lsp.Types.Range.create
-    ~start:(to_lsp_position lexbuf start)
-    ~end_:(to_lsp_position lexbuf end_)
-
-let make_diagnostic lexbuf node_opt message =
+let make_diagnostic (lexbuf : Lexing.lexbuf) node_opt message =
   let range =
     match node_opt with
-    | Some node -> Jaf.ast_node_pos node |> to_lsp_range lexbuf
-    | None -> to_lsp_range lexbuf (lexbuf.lex_start_p, lexbuf.lex_curr_p)
+    | Some node ->
+        Jaf.ast_node_pos node |> Document.to_lsp_range lexbuf.lex_buffer
+    | None ->
+        Document.to_lsp_range lexbuf.lex_buffer
+          (lexbuf.lex_start_p, lexbuf.lex_curr_p)
   in
   Lsp.Types.Diagnostic.create ~range ~message ()
 
@@ -73,6 +50,9 @@ class lsp_server =
     val mutable workspace : Workspace.t option = None
     val mutable ain : Ain.t = Ain.create 4 0
 
+    val buffers : (string, Document.t) Hashtbl.t =
+      Hashtbl.create (module String)
+
     method private load_workspace ~notify_back path =
       try
         let ws = Workspace.load path in
@@ -98,6 +78,12 @@ class lsp_server =
               }
           in
           let jaf = Parser.jaf Lexer.token lexbuf in
+          let document =
+            Document.{ ctx; text = lexbuf.lex_buffer; toplevel = jaf }
+          in
+          Hashtbl.set buffers
+            ~key:(Lsp.Types.DocumentUri.to_string uri)
+            ~data:document;
           Declarations.resolve_types ctx jaf false;
           TypeAnalysis.check_types ctx jaf
         with e -> [ e ]
@@ -163,8 +149,16 @@ class lsp_server =
         ~new_content =
       self#_on_doc ~notify_back d.uri new_content
 
-    method on_notif_doc_did_close ~notify_back:_ _d : unit Linol_lwt.t =
+    method on_notif_doc_did_close ~notify_back:_ d : unit Linol_lwt.t =
+      Hashtbl.remove buffers (Lsp.Types.DocumentUri.to_string d.uri);
       Linol_lwt.return ()
+
+    method! config_hover = Some (`Bool true)
+
+    method! on_req_hover ~notify_back:_ ~id:_ ~uri ~pos ~workDoneToken:_ _ =
+      match Hashtbl.find buffers (Lsp.Types.DocumentUri.to_string uri) with
+      | Some doc -> Linol_lwt.return (Hover.get_hover doc pos)
+      | None -> Linol_lwt.return None
   end
 
 let run () =
