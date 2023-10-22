@@ -86,6 +86,7 @@ let rec multidim_array dims t =
 %token IF ELSE WHILE DO FOR SWITCH CASE DEFAULT NULL THIS NEW
 %token GOTO JUMP JUMPS CONTINUE BREAK RETURN
 %token CONST REF OVERRIDE ARRAY WRAP FUNCTYPE DELEGATE STRUCT CLASS PRIVATE PUBLIC ENUM
+%token GLOBALGROUP
 
 %token EOF
 
@@ -423,6 +424,8 @@ external_declaration
     { [Enum ({ loc=$sloc; name=None; values=$2 })] }
   | ENUM IDENTIFIER enumerator_list SEMICOLON
     { [Enum ({ loc=$sloc; name=Some $2; values=$3 })] }
+  | GLOBALGROUP IDENTIFIER LBRACE declaration+ RBRACE
+    { List.concat $4 |> List.map (fun d -> Global (d)) }
   ;
 
 struct_or_class

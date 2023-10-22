@@ -113,6 +113,7 @@ let () =
               "private",      PRIVATE;
               "public",       PUBLIC;
               "enum",         ENUM;
+              "globalgroup",  GLOBALGROUP;
               "imain_system", IMAINSYSTEM ]
 }
 
