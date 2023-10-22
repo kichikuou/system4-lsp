@@ -54,6 +54,9 @@ let member_func loc typespec_opt struct_name is_dtor name params body =
   let fundecl = func loc (Option.value typespec_opt ~default:(qtype None Void)) name params body in
   { fundecl with struct_name=Some struct_name }
 
+let rec multidim_array dims t =
+  if dims <= 0 then t else multidim_array (dims - 1) (Array (qtype None t))
+
 %}
 
 %token <int> I_CONSTANT
@@ -133,7 +136,7 @@ string
 postfix_expression
   : primary_expression { $1 }
   | postfix_expression LBRACKET expression RBRACKET { expr $sloc (Subscript ($1, $3)) }
-  | atomic_type_specifier LPAREN expression RPAREN { expr $sloc (Cast ($1, $3)) }
+  | primitive_type_specifier LPAREN expression RPAREN { expr $sloc (Cast ($1, $3)) }
   | postfix_expression arglist { expr $sloc (Call ($1, $2, None)) }
   | NEW IDENTIFIER arglist { expr $sloc (New (Unresolved ($2), $3, None)) }
   | postfix_expression DOT IDENTIFIER { expr $sloc (Member ($1, $3, None)) }
@@ -160,7 +163,7 @@ unary_operator
 
 cast_expression
   : unary_expression { $1 }
-  | LPAREN atomic_type_specifier RPAREN cast_expression { expr $sloc (Cast ($2, $4)) }
+  | LPAREN primitive_type_specifier RPAREN cast_expression { expr $sloc (Cast ($2, $4)) }
   ;
 
 mul_expression
@@ -256,7 +259,7 @@ constant_expression
   : cond_expression { $1 }
   ;
 
-atomic_type_specifier
+primitive_type_specifier
   : VOID         { Void }
   | CHAR         { Int }
   | INT          { Int }
@@ -277,12 +280,16 @@ type_qualifier
   | OVERRIDE { Override }
   ;
 
+atomic_type_specifier
+  : primitive_type_specifier { $1 }
+  | IDENTIFIER { Unresolved ($1) }
+
 type_specifier
   : atomic_type_specifier { $1 }
   (* FIXME: this disallows arrays/wraps of ref-qualified types *)
-  | ARRAY AT type_specifier { Array (qtype None $3) }
+  | ARRAY AT atomic_type_specifier AT I_CONSTANT { multidim_array $5 $3 }
+  | ARRAY AT atomic_type_specifier { Array (qtype None $3) }
   | WRAP AT type_specifier { Wrap (qtype None $3) }
-  | IDENTIFIER { Unresolved ($1) }
 
 statement
   : declaration_statement { stmt $sloc $1 }
