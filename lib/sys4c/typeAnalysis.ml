@@ -576,12 +576,25 @@ class type_analyze_visitor ctx = object (self)
               | Some v ->
                   begin match v.type_spec.qualifier with
                   | Some Ref ->
-                      type_check (ASTStatement stmt) (Option.value_exn lhs.valuetype).data rhs
+                      begin match Option.value_exn rhs.valuetype with
+                      | { data=NullType; _ } -> ()
+                      | _ -> type_check (ASTStatement stmt) (Option.value_exn lhs.valuetype).data rhs
+                      end
                   | _ ->
                       ref_type_error (Option.value_exn rhs.valuetype).data (Some lhs) (ASTStatement stmt)
                   end
               | None ->
                   undefined_variable_error name (ASTStatement stmt)
+              end
+          | Member (_, _, Some (ClassVariable _)) ->
+              begin match Option.value_exn lhs.valuetype with
+              | { is_ref=true; data } ->
+                  begin match Option.value_exn rhs.valuetype with
+                  | { data=NullType; _ } -> ()
+                  | _ -> type_check (ASTStatement stmt) data rhs
+                  end
+              | _ ->
+                  ref_type_error (Option.value_exn rhs.valuetype).data (Some lhs) (ASTStatement stmt)
               end
           | _ ->
               (* FIXME? this isn't really a _type_ error *)
