@@ -148,6 +148,10 @@ val load : string -> t
 val write : ?raw:bool -> t -> Out_channel.t -> unit
 val write_file : t -> string -> unit
 
+val type_to_string_hum : t -> Type.t -> string
+val function_to_string_hum : t -> Function.t -> string
+val variable_to_string_hum : t -> Variable.t -> string
+
 val get_global : t -> string -> Variable.t option
 val get_global_by_index : t -> int -> Variable.t
 val set_global_type : t -> string -> Type.t -> unit

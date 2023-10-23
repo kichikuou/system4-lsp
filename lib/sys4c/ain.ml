@@ -1517,6 +1517,46 @@ let write ?(raw = false) ain out =
 let write_file ain file =
   Out_channel.with_file file ~f:(write ain) ~binary:true
 
+(* stringify *)
+
+let rec data_to_string ain = function
+  | Type.Void -> "void"
+  | Int -> "int"
+  | Float -> "float"
+  | String -> "string"
+  | Struct (no) -> ain.structures.(no).name
+  | IMainSystem -> "IMainSystem"
+  | FuncType (no) -> if no >= 0 then ain.function_types.(no).name else "functype"
+  | Bool -> "bool"
+  | LongInt -> "lint"
+  | Delegate (no) -> ain.delegates.(no).name
+  | HLLFunc2 -> "hll_func2"
+  | HLLParam -> "hll_param"
+  | Array (t) -> "array@" ^ type_to_string_hum ain t
+  | Wrap (t) -> sprintf "wrap<%s>" (type_to_string_hum ain t)
+  | Option (t) -> sprintf "option<%s>" (type_to_string_hum ain t)
+  | Unknown87 (t) -> sprintf "unknown87<%s>" (type_to_string_hum ain t)
+  | IFace (no) -> sprintf "interface<%d>" no (* FIXME: look up name in ain object *)
+  | Enum2 (no) -> sprintf "enum2<%d>" no (* FIXME *)
+  | Enum (no) -> sprintf "enum<%d>" no (* FIXME *)
+  | HLLFunc -> "hll_func"
+  | Unknown98 -> "unknown_98"
+  | IFaceWrap (no) -> sprintf "interface_wrap<%d>" no (* FIXME: look up name in ain object *)
+  | Function (no)
+  | Method (no) ->
+    if no >= 0
+    then function_to_string_hum ain (ain.functions.(no))
+    else "function"
+  | NullType -> "null"
+and type_to_string_hum ain o =
+  let prefix = if o.is_ref then "ref " else "" in
+  prefix ^ (data_to_string ain o.data)
+and function_to_string_hum ain (f : Function.t) =
+  sprintf "%s %s(%s)" (type_to_string_hum ain f.return_type) f.name
+    (List.map (List.take f.vars f.nr_args) ~f:(variable_to_string_hum ain) |> String.concat ~sep:", ")
+and variable_to_string_hum ain (f : Variable.t) =
+  sprintf "%s %s" (type_to_string_hum ain f.value_type) f.name
+
 (* globals *)
 
 let get_global ain name =

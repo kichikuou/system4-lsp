@@ -107,14 +107,14 @@ class lsp_server =
               match actual_opt with
               | Some actual -> (
                   match actual.valuetype with
-                  | Some t -> "\n Actual type: " ^ Ain.Type.to_string t
+                  | Some t -> "\n Actual type: " ^ Ain.type_to_string_hum ain t
                   | None -> "")
               | None -> ""
             in
             Some
               (make_diagnostic lexbuf (Some node)
                  ("Type error.\n Expected type: "
-                 ^ Ain.Type.to_string expected
+                 ^ Ain.type_to_string_hum ain expected
                  ^ actual))
         | CompileError.Arity_error (func, args, node) ->
             Some
