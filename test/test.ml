@@ -10,6 +10,10 @@ let analyze source =
         Stdio.printf "(%d, %d) - (%d, %d) %s\n" range.start.line
           range.start.character range.end_.line range.end_.character message)
 
+let%expect_test "empty doc" =
+  analyze {||};
+  [%expect {| ok |}]
+
 let%expect_test "empty function" =
   analyze {|
     void f() {}
