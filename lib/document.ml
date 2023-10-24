@@ -79,7 +79,7 @@ let make_error ain lexbuf exn =
   | CompileError.Undefined_variable (name, node) ->
       make lexbuf (Some node) ("Undefined variable: " ^ name)
   | CompileError.Not_lvalue_error (_e, node) ->
-      make lexbuf (Some node) "Lvalue expected"
+      make lexbuf (Some node) "Lvalue expected."
   | CompileError.Type_error (expected, actual_opt, node) ->
       let actual =
         match actual_opt with
