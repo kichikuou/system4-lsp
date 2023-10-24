@@ -26,24 +26,10 @@ class type_declare_visitor ctx = object (self)
 
   val functions = Stack.create ()
 
-  method declare_function decl =
-    begin match (decl.return.qualifier, (Ain.get_function ctx.ain decl.name)) with
-    | (Some Override, None) ->
-        compile_error "function doesn't exist for override" (ASTDeclaration(Function decl))
-    | (Some Override, Some super_f) ->
-        decl.index <- Some super_f.index;
-        decl.super_index <- Some (Ain.dup_function ctx.ain super_f.index);
-        (* update index of overridden function, if it was defined in this file *)
-        let is_super f = (Option.value_exn f.index) = super_f.index in
-        begin match Stack.find functions ~f:is_super with
-        | Some f -> f.index <- decl.super_index
-        | None -> ()
-        end
-    | (_, Some _) ->
-        compile_error "Duplicate function definition" (ASTDeclaration(Function decl))
-    | (_, None) ->
-        decl.index <- Some (Ain.add_function ctx.ain decl.name).index
-    end;
+  method declare_function (decl : fundecl) =
+    decl.index <- Some (match Ain.get_function ctx.ain decl.name with
+      | Some f -> f.index;
+      | None -> (Ain.add_function ctx.ain decl.name).index);
     Stack.push functions decl
 
   method! visit_declaration decl =
@@ -52,24 +38,22 @@ class type_declare_visitor ctx = object (self)
         begin match g.type_spec.qualifier with
         | Some Const -> ()
         | _ ->
-            if Option.is_some (Ain.get_global ctx.ain g.name) then
-              compile_error "duplicate global variable definition" (ASTDeclaration decl);
-            g.index <- Some (Ain.add_global ctx.ain g.name)
+            g.index <- Some (match Ain.get_global ctx.ain g.name with
+              | Some g -> g.index
+              | None -> Ain.add_global ctx.ain g.name)
         end
     | Function (f) ->
         self#declare_function f
     | FuncTypeDef (f) ->
-        if Option.is_some (Ain.get_functype ctx.ain f.name) then
-          compile_error "duplicate functype definition" (ASTDeclaration decl);
-        ignore (Ain.add_functype ctx.ain f.name : Ain.FunctionType.t)
+        if Option.is_none (Ain.get_functype ctx.ain f.name) then
+          ignore (Ain.add_functype ctx.ain f.name : Ain.FunctionType.t)
     | DelegateDef (f) ->
-        if Option.is_some (Ain.get_delegate ctx.ain f.name) then
-          compile_error "duplicate delegate definition" (ASTDeclaration decl);
-        ignore (Ain.add_delegate ctx.ain f.name : Ain.FunctionType.t)
+        if Option.is_none (Ain.get_delegate ctx.ain f.name) then
+          ignore (Ain.add_delegate ctx.ain f.name : Ain.FunctionType.t)
     | StructDef (s) ->
-        if Option.is_some (Ain.get_struct ctx.ain s.name) then
-          compile_error "duplicate struct definition" (ASTDeclaration decl);
-        let ain_s = Ain.add_struct ctx.ain s.name in
+        let ain_s = (match Ain.get_struct ctx.ain s.name with
+          | Some s -> s
+          | None -> Ain.add_struct ctx.ain s.name) in
         let visit_decl = function
           | AccessSpecifier _ -> ()
           | Constructor f ->
@@ -207,7 +191,7 @@ class type_define_visitor ctx = object
     | Global (g) ->
         begin match g.type_spec.qualifier with
         | Some Const ->
-            ctx.const_vars <- g::ctx.const_vars
+            ctx.const_vars <- g::ctx.const_vars  (* FIXME: replace existing entry *)
         | _ ->
             Ain.set_global_type ctx.ain g.name (jaf_to_ain_type g.type_spec)
         end

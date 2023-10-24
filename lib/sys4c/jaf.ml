@@ -66,7 +66,6 @@ type assign_op =
 type type_qualifier =
   | Const
   | Ref
-  | Override
 
 type type_specifier = {
   mutable data : data_type;
@@ -552,7 +551,6 @@ let assign_op_to_string op =
 let type_qualifier_to_string = function
   | Const -> "const"
   | Ref -> "ref"
-  | Override -> "override"
 
 let rec data_type_to_string = function
   | Untyped -> "untyped"

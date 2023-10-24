@@ -85,7 +85,7 @@ let rec multidim_array dims t =
 /* keywords */
 %token IF ELSE WHILE DO FOR SWITCH CASE DEFAULT NULL THIS NEW
 %token GOTO JUMP JUMPS CONTINUE BREAK RETURN
-%token CONST REF OVERRIDE ARRAY WRAP FUNCTYPE DELEGATE STRUCT CLASS PRIVATE PUBLIC ENUM
+%token CONST REF ARRAY WRAP FUNCTYPE DELEGATE STRUCT CLASS PRIVATE PUBLIC ENUM
 %token GLOBALGROUP
 
 %token EOF
@@ -278,7 +278,6 @@ primitive_type_specifier
 type_qualifier
   : CONST { Const }
   | REF { Ref }
-  | OVERRIDE { Override }
   ;
 
 atomic_type_specifier

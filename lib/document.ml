@@ -109,7 +109,9 @@ let create ain text =
   in
   try
     let toplevel = Parser.jaf Lexer.token lexbuf in
+    Declarations.register_type_declarations ctx toplevel;
     Declarations.resolve_types ctx toplevel false;
+    Declarations.define_types ctx toplevel;
     let errors =
       TypeAnalysis.check_types ctx toplevel
       |> List.map ~f:(make_error ain lexbuf)
