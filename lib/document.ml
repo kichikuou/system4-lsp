@@ -63,6 +63,8 @@ type t = {
   errors : (Lsp.Types.Range.t * string) list;
 }
 
+external reraise : exn -> 'a = "%reraise"
+
 let make_error ain lexbuf exn =
   let make (lexbuf : Lexing.lexbuf) node_opt message =
     let range =
@@ -98,7 +100,7 @@ let make_error ain lexbuf exn =
         (Printf.sprintf
            "Arity error. '%s' expects %d arguments, but %d provided." func.name
            func.nr_args (List.length args))
-  | e -> raise e
+  | e -> reraise e
 
 let create ain text =
   let lexbuf = Lexing.from_string text in

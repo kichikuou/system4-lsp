@@ -32,11 +32,17 @@ class lsp_server =
 
     method private _on_doc ~(notify_back : Linol_lwt.Jsonrpc2.notify_back)
         (uri : Lsp.Types.DocumentUri.t) (contents : string) =
-      let doc = Document.create ain contents in
-      Hashtbl.set buffers ~key:(Lsp.Types.DocumentUri.to_string uri) ~data:doc;
-      notify_back#send_diagnostic
-        (List.map doc.errors ~f:(fun (range, message) ->
-             Lsp.Types.Diagnostic.create ~range ~message ()))
+      try
+        let doc = Document.create ain contents in
+        Hashtbl.set buffers ~key:(Lsp.Types.DocumentUri.to_string uri) ~data:doc;
+        notify_back#send_diagnostic
+          (List.map doc.errors ~f:(fun (range, message) ->
+               Lsp.Types.Diagnostic.create ~range ~message ()))
+      with e ->
+        log_error notify_back
+          (Exn.to_string e ^ "\n"
+          ^ Backtrace.to_string (Backtrace.Exn.most_recent ()));
+        Lwt.return ()
 
     (* Do not use incremental update, to work around a bug in lsp 1.14 where its
        content change application logic is confused when the newline code is CRLF. *)
