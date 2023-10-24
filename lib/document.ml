@@ -1,8 +1,6 @@
 open Base
 open Sys4c
 
-type t = { ctx : Jaf.context; text : bytes; toplevel : Jaf.declaration list }
-
 (* LSP expects character offsets based on utf-16 representation. *)
 let count_utf16_code_units_of_utf8_bytes bytes start end_ =
   let rec loop i n =
@@ -35,6 +33,93 @@ let range_contains text range (pos : Lsp.Types.Position.t) =
   || (start.line = pos.line && start.character <= pos.character))
   && (end_.line > pos.line
      || (end_.line = pos.line && end_.character >= pos.character))
+
+let predefined_constants =
+  [
+    Jaf.
+      {
+        name = "true";
+        type_spec = { data = Bool; qualifier = Some Const };
+        location = (Lexing.dummy_pos, Lexing.dummy_pos);
+        array_dim = [];
+        initval = None;
+        index = None;
+      };
+    Jaf.
+      {
+        name = "false";
+        type_spec = { data = Bool; qualifier = Some Const };
+        location = (Lexing.dummy_pos, Lexing.dummy_pos);
+        array_dim = [];
+        initval = None;
+        index = None;
+      };
+  ]
+
+type t = {
+  ctx : Jaf.context;
+  text : bytes;
+  toplevel : Jaf.declaration list;
+  errors : (Lsp.Types.Range.t * string) list;
+}
+
+let make_error ain lexbuf exn =
+  let make (lexbuf : Lexing.lexbuf) node_opt message =
+    let range =
+      match node_opt with
+      | Some node -> Jaf.ast_node_pos node |> to_lsp_range lexbuf.lex_buffer
+      | None ->
+          to_lsp_range lexbuf.lex_buffer (lexbuf.lex_start_p, lexbuf.lex_curr_p)
+    in
+    (range, message)
+  in
+  match exn with
+  | Parser.Error -> make lexbuf None "Syntax error."
+  | CompileError.CompileError (msg, node) -> make lexbuf (Some node) msg
+  | CompileError.Undefined_variable (name, node) ->
+      make lexbuf (Some node) ("Undefined variable: " ^ name)
+  | CompileError.Not_lvalue_error (_e, node) ->
+      make lexbuf (Some node) "Lvalue expected"
+  | CompileError.Type_error (expected, actual_opt, node) ->
+      let actual =
+        match actual_opt with
+        | Some actual -> (
+            match actual.valuetype with
+            | Some t -> "\n Actual type: " ^ Ain.type_to_string_hum ain t
+            | None -> "")
+        | None -> ""
+      in
+      make lexbuf (Some node)
+        ("Type error.\n Expected type: "
+        ^ Ain.type_to_string_hum ain expected
+        ^ actual)
+  | CompileError.Arity_error (func, args, node) ->
+      make lexbuf (Some node)
+        (Printf.sprintf
+           "Arity error. '%s' expects %d arguments, but %d provided." func.name
+           func.nr_args (List.length args))
+  | e -> raise e
+
+let create ain text =
+  let lexbuf = Lexing.from_string text in
+  let ctx =
+    Jaf.{ ain; import_ain = Ain.create 4 0; const_vars = predefined_constants }
+  in
+  try
+    let toplevel = Parser.jaf Lexer.token lexbuf in
+    Declarations.resolve_types ctx toplevel false;
+    let errors =
+      TypeAnalysis.check_types ctx toplevel
+      |> List.map ~f:(make_error ain lexbuf)
+    in
+    { ctx; text = lexbuf.lex_buffer; toplevel; errors }
+  with e ->
+    {
+      ctx;
+      text = lexbuf.lex_buffer;
+      toplevel = [];
+      errors = [ make_error ain lexbuf e ];
+    }
 
 class ast_locator (doc : t) (pos : Lsp.Types.Position.t) =
   object
