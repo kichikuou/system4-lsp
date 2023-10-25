@@ -243,10 +243,11 @@ class type_analyze_visitor ctx = object (self)
         arity_error f args (ASTExpression expr)
       else if nr_params > 0 then begin
         let check_arg (v:Ain.Variable.t) a =
-            (* NULL can be passed to ref parameters *)
-            match v.value_type, Option.value_exn a.valuetype with
-            | { is_ref=true; _ }, { data=NullType; _ } -> ()
-            | { data; _ }, _ -> check data a
+          if v.value_type.is_ref then begin
+            self#check_referenceable a (ASTExpression a);
+            ref_type_check (ASTExpression a) v.value_type.data a
+          end else
+            self#check_assign (ASTExpression a) v.value_type.data a
         in
         List.iter2_exn params args ~f:check_arg
       end
