@@ -189,6 +189,41 @@ class type_analyze_visitor ctx = object (self)
     | _ ->
         type_check parent t rhs
 
+    method check_ref_assign parent (lhs : expression) (rhs : expression) =
+      (* rhs must be a ref, or an lvalue in order to create a reference to it *)
+      self#check_ref_or_lvalue rhs parent;
+      (* check that lhs is a reference variable of the appropriate type *)
+      begin match lhs.node with
+      | Ident (name, _) ->
+          begin match environment#get_local name with
+          | Some v ->
+              begin match v.type_spec.qualifier with
+              | Some Ref ->
+                  begin match Option.value_exn rhs.valuetype with
+                  | { data=NullType; _ } -> ()
+                  | _ -> type_check parent (Option.value_exn lhs.valuetype).data rhs
+                  end
+              | _ ->
+                  ref_type_error (Option.value_exn rhs.valuetype).data (Some lhs) parent
+              end
+          | None ->
+              undefined_variable_error name parent
+          end
+      | Member (_, _, Some (ClassVariable _)) ->
+          begin match Option.value_exn lhs.valuetype with
+          | { is_ref=true; data } ->
+              begin match Option.value_exn rhs.valuetype with
+              | { data=NullType; _ } -> ()
+              | _ -> type_check parent data rhs
+              end
+          | _ ->
+              ref_type_error (Option.value_exn rhs.valuetype).data (Some lhs) parent
+          end
+      | _ ->
+          (* FIXME? this isn't really a _type_ error *)
+          ref_type_error (Option.value_exn rhs.valuetype).data (Some lhs) parent
+      end
+
   method! visit_expression expr =
     super#visit_expression expr;
     (* convenience functions which always pass parent expression *)
@@ -314,12 +349,15 @@ class type_analyze_visitor ctx = object (self)
             end;
             expr.valuetype <- Some (Ain.Type.make Int)
         | RefEqual | RefNEqual ->
-            begin match (Option.value_exn a.valuetype, Option.value_exn b.valuetype) with
-            | { data=NullType; _ }, _ -> () (* FIXME: check that rhs is a ref *)
-            | _, { data=NullType; _ } -> () (* FIXME: check that lhs is a ref *)
-            | { is_ref=true; _ }, { is_ref=true; _ } -> check_expr a b
-            | { is_ref=false; _ }, _ -> ref_type_error Void (Some a) (ASTExpression expr)
-            | _, { is_ref=false; _ } -> ref_type_error Void (Some b) (ASTExpression expr)
+            begin match a.node with
+            | Ident _
+            | Member (_, _, Some (ClassVariable _)) ->
+              self#check_ref_assign (ASTExpression expr) a b
+            | _ ->
+              begin
+                self#check_ref_or_lvalue b (ASTExpression expr);
+                check_expr a b
+              end
             end;
             expr.valuetype <- Some (Ain.Type.make Int)
         end;
@@ -567,39 +605,7 @@ class type_analyze_visitor ctx = object (self)
           end
       | MessageCall _ -> ()
       | RefAssign (lhs, rhs) ->
-          (* rhs must be a ref, or an lvalue in order to create a reference to it *)
-          self#check_ref_or_lvalue rhs (ASTStatement stmt);
-          (* check that lhs is a reference variable of the appropriate type *)
-          begin match lhs.node with
-          | Ident (name, _) ->
-              begin match environment#get_local name with
-              | Some v ->
-                  begin match v.type_spec.qualifier with
-                  | Some Ref ->
-                      begin match Option.value_exn rhs.valuetype with
-                      | { data=NullType; _ } -> ()
-                      | _ -> type_check (ASTStatement stmt) (Option.value_exn lhs.valuetype).data rhs
-                      end
-                  | _ ->
-                      ref_type_error (Option.value_exn rhs.valuetype).data (Some lhs) (ASTStatement stmt)
-                  end
-              | None ->
-                  undefined_variable_error name (ASTStatement stmt)
-              end
-          | Member (_, _, Some (ClassVariable _)) ->
-              begin match Option.value_exn lhs.valuetype with
-              | { is_ref=true; data } ->
-                  begin match Option.value_exn rhs.valuetype with
-                  | { data=NullType; _ } -> ()
-                  | _ -> type_check (ASTStatement stmt) data rhs
-                  end
-              | _ ->
-                  ref_type_error (Option.value_exn rhs.valuetype).data (Some lhs) (ASTStatement stmt)
-              end
-          | _ ->
-              (* FIXME? this isn't really a _type_ error *)
-              ref_type_error (Option.value_exn rhs.valuetype).data (Some lhs) (ASTStatement stmt)
-          end
+          self#check_ref_assign (ASTStatement stmt) lhs rhs
       | ObjSwap (lhs, rhs) ->
           self#check_lvalue lhs (ASTStatement stmt);
           self#check_lvalue rhs (ASTStatement stmt);

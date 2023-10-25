@@ -60,3 +60,74 @@ let%expect_test "type error" =
       (1, 19) - (1, 26) Type error.
        Expected type: int
        Actual type: string |}]
+
+let%expect_test "RefAssign operator" =
+  analyze
+    {|
+      struct S { int f; ref int rf; };
+      ref int ref_val() { return NULL; }
+      void f() {
+        int a = 1, b = 2;
+        ref int ra = a, rb = b;
+        S s;
+        ra <- rb;         // ok
+        ra <- a;          // ok
+        a <- ra;          // error: lhs is not a reference
+        NULL <- ra;       // error: lhs can't be the NULL keyword
+        ra <- NULL;       // ok
+        ra <- ref_val();  // ok
+        ra <- 3;          // error: rhs is not a lvalue
+        ref_val() <- ra;  // error: lhs is not a variable
+        s.rf <- ra;       // ok
+        s.f <- ra;        // error: lhs is not a reference
+      }
+    |};
+  [%expect
+    {|
+    (9, 8) - (9, 16) Type error.
+     Expected type: ref int
+     Actual type: int
+    (10, 8) - (10, 19) Type error.
+     Expected type: ref int
+     Actual type: null
+    (13, 8) - (13, 16) Lvalue expected.
+    (14, 8) - (14, 24) Type error.
+     Expected type: ref int
+     Actual type: ref int
+    (16, 8) - (16, 18) Type error.
+     Expected type: ref int
+     Actual type: int |}]
+
+let%expect_test "RefEqual operator" =
+  analyze
+    {|
+      struct S { int f; ref int rf; };
+      ref int ref_val() { return NULL; }
+      void f() {
+        int a = 1, b = 2;
+        ref int ra = a, rb = b;
+        S s;
+        ra === rb;         // ok
+        ra === a;          // ok
+        a === ra;          // error: lhs is not a reference
+        NULL === ra;       // error: lhs can't be the NULL keyword
+        ra === NULL;       // ok
+        ra === ref_val();  // ok
+        ra === 3;          // error: rhs is not a lvalue
+        ref_val() === ra;  // ok
+        s.rf === ra;       // ok
+        s.f === ra;        // error: lhs is not a reference
+      }
+    |};
+  [%expect
+    {|
+       (9, 8) - (9, 16) Type error.
+        Expected type: ref int
+        Actual type: int
+       (10, 8) - (10, 19) Type error.
+        Expected type: null
+        Actual type: int
+       (13, 8) - (13, 16) Lvalue expected.
+       (16, 8) - (16, 18) Type error.
+        Expected type: ref int
+        Actual type: int |}]
