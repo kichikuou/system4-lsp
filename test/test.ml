@@ -106,6 +106,52 @@ let%expect_test "function call" =
        Expected type: func
        Actual type: ref void f_float(float x) |}]
 
+let%expect_test "return statement" =
+  analyze
+    {|
+      functype void func();
+      void f_void() {
+        return;    // ok
+        return 3;  // error
+      }
+      int f_int() {
+        return;      // error
+        return 3;    // ok
+        return 3.0;  // ok
+        return "s";  // error
+      }
+      ref int f_ref_int() {
+        int i;
+        ref int ri;
+        ref float rf;
+        return NULL;  // ok
+        return i;     // ok
+        return ri;    // ok
+        return rf;    // error
+      }
+      func f_func() {
+        return NULL;     // ok
+        return &f_void;  // ok
+        return &f_int;   // error
+      }
+    |};
+  [%expect
+    {|
+      (4, 8) - (4, 17) Type error.
+       Expected type: void
+       Actual type: int
+      (7, 8) - (7, 15) Type error.
+       Expected type: int
+      (10, 8) - (10, 19) Type error.
+       Expected type: int
+       Actual type: string
+      (19, 8) - (19, 18) Type error.
+       Expected type: int
+       Actual type: float
+      (24, 8) - (24, 22) Type error.
+       Expected type: func
+       Actual type: ref int f_int() |}]
+
 let%expect_test "RefAssign operator" =
   analyze
     {|

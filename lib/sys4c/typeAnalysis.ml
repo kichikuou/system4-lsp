@@ -593,10 +593,12 @@ class type_analyze_visitor ctx = object (self)
           begin match environment#current_function with
           | None -> compiler_bug "return statement outside of function" (Some(ASTStatement stmt))
           | Some f ->
-              (* ref-type functions can return NULL *)
-              begin match f.return.qualifier, Option.value_exn e.valuetype with
-              | Some Ref, { data=NullType; _ } -> ()
-              | _, _ -> type_check (ASTStatement stmt) (jaf_to_ain_data_type f.return.data) e
+              begin match f.return.qualifier with
+              | Some Ref -> begin
+                self#check_referenceable e (ASTExpression e);
+                ref_type_check (ASTStatement stmt) (jaf_to_ain_data_type f.return.data) e
+              end
+              | _ -> self#check_assign (ASTStatement stmt) (jaf_to_ain_data_type f.return.data) e
               end
           end
       | Return (None) ->
