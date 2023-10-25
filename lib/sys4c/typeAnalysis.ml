@@ -123,7 +123,7 @@ class type_analyze_visitor ctx = object (self)
     with exn ->
       errors <- exn :: errors
 
-  (* an lvalue is an expression which denotes a location that can be assigned to/referenced *)
+  (* an lvalue is an expression which denotes a location that can be assigned to *)
   method check_lvalue (e:expression) (parent:ast_node) =
     let check_lvalue_type = function
       | Ain.Type.Function (_) -> not_an_lvalue_error e parent
@@ -136,11 +136,15 @@ class type_analyze_visitor ctx = object (self)
     | New (_, _, _) -> ()
     | _ -> not_an_lvalue_error e parent
 
-  method check_ref_or_lvalue (e:expression) (parent:ast_node) =
+  (* A value from which a reference can be made. NULL, reference, this, and lvalue are referenceable. *)
+  method check_referenceable (e:expression) (parent:ast_node) =
     match Option.value_exn e.valuetype with
     | { data=NullType; _ } -> ()
     | { is_ref=true; _ } -> ()
-    | _ -> self#check_lvalue e parent
+    | _ ->
+      match e.node with
+      | This -> ()
+      | _ -> self#check_lvalue e parent
 
   method check_delegate_compatible parent dg_i expr =
     match (Option.value_exn expr.valuetype) with
@@ -191,7 +195,7 @@ class type_analyze_visitor ctx = object (self)
 
     method check_ref_assign parent (lhs : expression) (rhs : expression) =
       (* rhs must be a ref, or an lvalue in order to create a reference to it *)
-      self#check_ref_or_lvalue rhs parent;
+      self#check_referenceable rhs parent;
       (* check that lhs is a reference variable of the appropriate type *)
       begin match lhs.node with
       | Ident (name, _) ->
@@ -353,9 +357,10 @@ class type_analyze_visitor ctx = object (self)
             | Ident _
             | Member (_, _, Some (ClassVariable _)) ->
               self#check_ref_assign (ASTExpression expr) a b
+            | This -> not_an_lvalue_error a (ASTExpression expr)
             | _ ->
               begin
-                self#check_ref_or_lvalue b (ASTExpression expr);
+                self#check_referenceable b (ASTExpression expr);
                 check_expr a b
               end
             end;
@@ -636,7 +641,7 @@ class type_analyze_visitor ctx = object (self)
     | Some expr ->
         begin match var.type_spec.qualifier with
         | Some Ref ->
-            self#check_ref_or_lvalue expr (ASTVariable var);
+            self#check_referenceable expr (ASTVariable var);
             type_check (ASTVariable var) (jaf_to_ain_data_type var.type_spec.data) expr
         | _ ->
             self#check_assign (ASTVariable var) (jaf_to_ain_data_type var.type_spec.data) expr
