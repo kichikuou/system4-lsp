@@ -133,6 +133,7 @@ let%expect_test "RefEqual operator" =
         other === this;    // ok
         this === other;    // error: lhs is not a reference
         ref_S() === this;  // ok
+        ref_S() === NULL;  // ok
       }
     |};
   [%expect

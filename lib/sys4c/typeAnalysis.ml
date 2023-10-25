@@ -87,6 +87,11 @@ let type_check parent expected actual =
       if not (type_equal expected a_t.data) then
         data_type_error expected (Some actual) parent
 
+let ref_type_check parent expected actual =
+  match Option.value_exn actual.valuetype with
+  | { data=NullType; _ } -> ()
+  | _ -> type_check parent expected actual
+
 let type_check_numeric parent actual =
   match actual.valuetype with
   | Some {data=(Int|Bool|LongInt|Float); _} -> ()
@@ -203,10 +208,7 @@ class type_analyze_visitor ctx = object (self)
           | Some v ->
               begin match v.type_spec.qualifier with
               | Some Ref ->
-                  begin match Option.value_exn rhs.valuetype with
-                  | { data=NullType; _ } -> ()
-                  | _ -> type_check parent (Option.value_exn lhs.valuetype).data rhs
-                  end
+                  ref_type_check parent (Option.value_exn lhs.valuetype).data rhs
               | _ ->
                   ref_type_error (Option.value_exn rhs.valuetype).data (Some lhs) parent
               end
@@ -216,10 +218,7 @@ class type_analyze_visitor ctx = object (self)
       | Member (_, _, Some (ClassVariable _)) ->
           begin match Option.value_exn lhs.valuetype with
           | { is_ref=true; data } ->
-              begin match Option.value_exn rhs.valuetype with
-              | { data=NullType; _ } -> ()
-              | _ -> type_check parent data rhs
-              end
+              ref_type_check parent data rhs
           | _ ->
               ref_type_error (Option.value_exn rhs.valuetype).data (Some lhs) parent
           end
@@ -361,7 +360,7 @@ class type_analyze_visitor ctx = object (self)
             | _ ->
               begin
                 self#check_referenceable b (ASTExpression expr);
-                check_expr a b
+                ref_type_check (ASTExpression expr) (Option.value_exn a.valuetype).data b
               end
             end;
             expr.valuetype <- Some (Ain.Type.make Int)
