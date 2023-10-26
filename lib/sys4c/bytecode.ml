@@ -1318,6 +1318,7 @@ type builtin =
   | ArrayInsert
   | ArraySort
   | ArrayFind
+  | ArrayReverse
   | DelegateSet
   | DelegateAdd
   | DelegateNumof
@@ -1363,6 +1364,7 @@ let array_builtin_of_string = function
   | "Insert" -> Some ArrayInsert
   | "Sort" -> Some ArraySort
   | "Find" -> Some ArrayFind
+  | "Reverse" -> Some ArrayReverse
   | _ -> None
 
 let delegate_builtin_of_string = function
@@ -1449,6 +1451,7 @@ let function_of_builtin builtin t_param =
   | ArrayInsert      -> make_function t_void "Insert" [t_int; Option.value_exn t_param]
   | ArraySort        -> make_function t_void "Sort" [t_func]
   | ArrayFind        -> make_function t_int "Find" [t_int; t_int; Option.value_exn t_param; t_func]
+  | ArrayReverse     -> make_function t_void "Reverse" []
   | DelegateSet      -> make_function t_void "Set" [t_method]
   | DelegateAdd      -> make_function t_void "Add" [t_method]
   | DelegateNumof    -> make_function t_int "Numof" []
