@@ -517,6 +517,8 @@ class type_analyze_visitor ctx = object (self)
     | Call (e, args, _) ->
         begin match (Option.value_exn e.valuetype).data with
         | FuncType no ->
+            if no < 0 then
+              compile_error "Definition of functype not found." (ASTExpression e);
             let f = Ain.function_of_functype_index ctx.ain no in
             check_call f args;
             expr.node <- Call (e, args, Some (FuncTypeCall no));
