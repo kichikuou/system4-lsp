@@ -28,7 +28,7 @@ let pje_get pje key =
 
 let load root_path =
   let pje_files =
-    Sys_unix.readdir root_path
+    Stdlib.Sys.readdir root_path
     |> Array.filter ~f:(fun file -> Filename.check_suffix file ".pje")
   in
   match pje_files with
