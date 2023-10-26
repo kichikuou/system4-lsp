@@ -164,11 +164,13 @@ let%expect_test "RefAssign operator" =
       struct S { int f; ref int rf; };
       ref int ref_val() { return NULL; }
       ref S ref_S() { return NULL; }
+      int g_i;
+      ref int g_ri;
       void S::f(ref S other) {
         int a = 1, b = 2;
-        ref int ra = a, rb = b;
+        ref int ra = a;
         S s;
-        ra <- rb;         // ok
+        ra <- ra;         // ok
         ra <- a;          // ok
         a <- ra;          // error: lhs is not a reference
         NULL <- ra;       // error: lhs can't be the NULL keyword
@@ -181,29 +183,40 @@ let%expect_test "RefAssign operator" =
         s.f <- ra;        // error: lhs is not a reference
         other <- this;    // ok
         this <- other;    // error: lhs is not a reference
+        g_ri <- ra;       // ok
+        g_i <- ra;        // error: lhs is not a reference
+        false <- NULL;    // error: lhs is not a reference
+        undefined <- ra;  // error: undefined is not defined
       }
     |};
   [%expect
     {|
-      (10, 8) - (10, 16) Type error.
+      (12, 8) - (12, 16) Type error.
        Expected type: ref int
        Actual type: int
-      (11, 8) - (11, 19) Type error.
+      (13, 8) - (13, 19) Type error.
        Expected type: ref int
        Actual type: null
-      (14, 8) - (14, 22) Type error.
+      (16, 8) - (16, 22) Type error.
        Expected type: int
        Actual type: ref S
-      (15, 8) - (15, 16) Lvalue expected.
-      (16, 8) - (16, 24) Type error.
+      (17, 8) - (17, 16) Lvalue expected.
+      (18, 8) - (18, 24) Type error.
        Expected type: ref int
        Actual type: ref int
-      (18, 8) - (18, 18) Type error.
+      (20, 8) - (20, 18) Type error.
        Expected type: ref int
        Actual type: int
-      (20, 8) - (20, 22) Type error.
+      (22, 8) - (22, 22) Type error.
        Expected type: ref S
-       Actual type: S |}]
+       Actual type: S
+      (24, 8) - (24, 18) Type error.
+       Expected type: ref int
+       Actual type: int
+      (25, 8) - (25, 22) Type error.
+       Expected type: ref null
+       Actual type: bool
+      (26, 8) - (26, 17) Undefined variable: undefined |}]
 
 let%expect_test "RefEqual operator" =
   analyze
@@ -211,11 +224,13 @@ let%expect_test "RefEqual operator" =
       struct S { int f; ref int rf; };
       ref int ref_int() { return NULL; }
       ref S ref_S() { return NULL; }
+      int g_i;
+      ref int g_ri;
       void S::f(ref S other) {
         int a = 1, b = 2;
-        ref int ra = a, rb = b;
+        ref int ra = a;
         S s;
-        ra === rb;         // ok
+        ra === ra;         // ok
         ra === a;          // ok
         a === ra;          // error: lhs is not a reference
         NULL === ra;       // error: lhs can't be the NULL keyword
@@ -231,24 +246,35 @@ let%expect_test "RefEqual operator" =
         this === other;    // error: lhs is not a reference
         ref_S() === this;  // ok
         ref_S() === NULL;  // ok
+        g_ri === ra;       // ok
+        g_i === ra;        // error: lhs is not a reference
+        false === NULL;    // error: lhs is not a reference
+        undefined === ra;  // error: undefined is not defined
       }
     |};
   [%expect
     {|
-      (10, 8) - (10, 16) Type error.
+      (12, 8) - (12, 16) Type error.
        Expected type: ref int
        Actual type: int
-      (11, 8) - (11, 19) Type error.
+      (13, 8) - (13, 19) Type error.
        Expected type: null
        Actual type: int
-      (14, 8) - (14, 22) Type error.
+      (16, 8) - (16, 22) Type error.
        Expected type: int
        Actual type: ref S
-      (15, 8) - (15, 22) Type error.
+      (17, 8) - (17, 22) Type error.
        Expected type: S
        Actual type: int
-      (16, 8) - (16, 16) Lvalue expected.
-      (19, 8) - (19, 18) Type error.
+      (18, 8) - (18, 16) Lvalue expected.
+      (21, 8) - (21, 18) Type error.
        Expected type: ref int
        Actual type: int
-      (21, 8) - (21, 22) Lvalue expected. |}]
+      (23, 8) - (23, 22) Lvalue expected.
+      (27, 8) - (27, 18) Type error.
+       Expected type: ref int
+       Actual type: int
+      (28, 8) - (28, 22) Type error.
+       Expected type: ref null
+       Actual type: bool
+      (29, 8) - (29, 17) Undefined variable: undefined |}]

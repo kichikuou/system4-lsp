@@ -204,16 +204,23 @@ class type_analyze_visitor ctx = object (self)
       (* check that lhs is a reference variable of the appropriate type *)
       begin match lhs.node with
       | Ident (name, _) ->
-          begin match environment#get_local name with
-          | Some v ->
+          begin match environment#resolve name with
+          | ResolvedLocal v ->
               begin match v.type_spec.qualifier with
               | Some Ref ->
                   ref_type_check parent (Option.value_exn lhs.valuetype).data rhs
               | _ ->
                   ref_type_error (Option.value_exn rhs.valuetype).data (Some lhs) parent
               end
-          | None ->
+          | ResolvedGlobal g ->
+              if g.value_type.is_ref then
+                  ref_type_check parent (Option.value_exn lhs.valuetype).data rhs
+              else
+                  ref_type_error (Option.value_exn rhs.valuetype).data (Some lhs) parent
+          | UnresolvedName ->
               undefined_variable_error name parent
+          | _ ->
+              ref_type_error (Option.value_exn rhs.valuetype).data (Some lhs) parent
           end
       | Member (_, _, Some (ClassVariable _)) ->
           begin match Option.value_exn lhs.valuetype with
