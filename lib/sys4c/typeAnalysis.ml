@@ -646,7 +646,7 @@ class type_analyze_visitor ctx = object (self)
         begin match var.type_spec.qualifier with
         | Some Ref ->
             self#check_referenceable expr (ASTVariable var);
-            type_check (ASTVariable var) (jaf_to_ain_data_type var.type_spec.data) expr
+            ref_type_check (ASTVariable var) (jaf_to_ain_data_type var.type_spec.data) expr
         | _ ->
             self#check_assign (ASTVariable var) (jaf_to_ain_data_type var.type_spec.data) expr
         end

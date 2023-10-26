@@ -152,6 +152,12 @@ let%expect_test "return statement" =
        Expected type: func
        Actual type: ref int f_int() |}]
 
+let%expect_test "variable declarations" =
+  analyze {|
+      ref int ri = NULL;       // ok
+    |};
+  [%expect {| ok |}]
+
 let%expect_test "RefAssign operator" =
   analyze
     {|
