@@ -215,6 +215,7 @@ rule token = parse
   | eof                     { EOF }
 
 and block_comment = parse
-    "*/"  { token lexbuf }
-  | _     { block_comment lexbuf }
-  | eof   { failwith "unterminated block comment" }
+    "*/"      { token lexbuf }
+  | [^ '\n']  { block_comment lexbuf }
+  | ['\n']    { Lexing.new_line lexbuf; block_comment lexbuf }
+  | eof       { failwith "unterminated block comment" }
