@@ -9,9 +9,14 @@ homepage: "https://github.com/kichikuou/system4-lsp"
 doc: "https://github.com/kichikuou/system4-lsp"
 bug-reports: "https://github.com/kichikuou/system4-lsp/issues"
 depends: [
-  "linol-lwt" {>= "0.4"}
   "ocaml"
+  "core"
+  "camlzip"
   "dune" {>= "3.0"}
+  "menhir"
+  "lsp" {>= "1.14" & < "1.15"}
+  "lwt"
+  "logs"
   "odoc" {with-doc}
 ]
 build: [

@@ -20,6 +20,12 @@
  (synopsis "Language server for System4")
  (description "A language server for AliceSoft's System4 language.")
  (depends
-  (linol-lwt (>= 0.4))
   ocaml
-  dune))
+  core
+  camlzip
+  dune
+  menhir
+  ;; linol dependencies
+  (lsp (and (>= 1.14) (< 1.15)))
+  lwt
+  logs))
