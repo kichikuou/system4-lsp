@@ -11,22 +11,13 @@ let log_info notify_back msg =
 let log_error notify_back msg =
   send_log_msg notify_back Lsp.Types.MessageType.Error msg
 
-class lsp_server =
+class lsp_server ain_path =
   object (self)
     inherit Linol_lwt.Jsonrpc2.server as super
-    val mutable workspace : Workspace.t option = None
     val mutable ain : Ain.t = Ain.create 4 0
 
     val buffers : (string, Document.t) Hashtbl.t =
       Hashtbl.create (module String)
-
-    method private load_workspace ~notify_back path =
-      try
-        let ws = Workspace.load path in
-        workspace <- Some ws;
-        ain <- Ain.load (Workspace.ain_path ws);
-        log_info notify_back (Workspace.ain_path ws ^ " loaded")
-      with e -> log_error notify_back (Exn.to_string e)
 
     method spawn_query_handler f = Linol_lwt.spawn f
 
@@ -53,9 +44,11 @@ class lsp_server =
       }
 
     method! on_req_initialize ~notify_back i =
-      (match i.rootPath with
-      | Some (Some path) -> self#load_workspace ~notify_back path
-      | _ -> ());
+      (if not (String.is_empty ain_path) then
+         try
+           ain <- Ain.load ain_path;
+           log_info notify_back (ain_path ^ " loaded")
+         with e -> log_error notify_back (Exn.to_string e));
       super#on_req_initialize ~notify_back i
 
     method on_notif_doc_did_open ~notify_back d ~content : unit Linol_lwt.t =
@@ -77,10 +70,22 @@ class lsp_server =
       | None -> Linol_lwt.return None
   end
 
-let run () =
-  let s = new lsp_server in
+let run ain =
+  let s = new lsp_server ain in
   let server = Linol_lwt.Jsonrpc2.create_stdio s in
   let task = Linol_lwt.Jsonrpc2.run server in
   Linol_lwt.run task
 
-let () = run ()
+let () =
+  let ain = ref "" in
+  let usage_msg = "Usage: system4-lsp --ain <file>" in
+  let speclist =
+    [ ("--ain", Stdlib.Arg.Set_string ain, ".ain file to load") ]
+  in
+  let anon_fun s =
+    Stdlib.Arg.usage speclist
+      (Printf.sprintf "extra argument \"%s\"\n%s" s usage_msg);
+    Stdlib.exit 2
+  in
+  Stdlib.Arg.parse speclist anon_fun usage_msg;
+  run !ain
