@@ -1,15 +1,31 @@
 open Base
+open Lwt.Syntax
 open Sys4c
 open System4_lsp
 
-let send_log_msg notify_back type_ msg =
-  notify_back#send_log_msg ~type_ msg |> ignore
+let show_error notify_back message =
+  let params =
+    Lsp.Types.ShowMessageParams.create ~type_:Lsp.Types.MessageType.Error
+      ~message
+  in
+  notify_back#send_notification (Lsp.Server_notification.ShowMessage params)
 
-let log_info notify_back msg =
-  send_log_msg notify_back Lsp.Types.MessageType.Info msg
+let show_exn notify_back e =
+  let msg = Stdlib.Printexc.to_string e in
+  Lwt.join
+    [
+      show_error notify_back msg;
+      (* Also notify the backtrace with logMessage. *)
+      notify_back#send_log_msg ~type_:Lsp.Types.MessageType.Error
+        (msg ^ "\n" ^ Backtrace.to_string (Backtrace.Exn.most_recent ()));
+    ]
 
-let log_error notify_back msg =
-  send_log_msg notify_back Lsp.Types.MessageType.Error msg
+(* The default exception printer escapes utf-8 sequences. Try to prevent that
+   from happening as much as possible. *)
+let () =
+  Stdlib.Printexc.register_printer (function
+    | Sys_error msg -> Some msg
+    | _ -> None)
 
 class lsp_server ain_path =
   object (self)
@@ -29,11 +45,7 @@ class lsp_server ain_path =
         notify_back#send_diagnostic
           (List.map doc.errors ~f:(fun (range, message) ->
                Lsp.Types.Diagnostic.create ~range ~message ()))
-      with e ->
-        log_error notify_back
-          (Exn.to_string e ^ "\n"
-          ^ Backtrace.to_string (Backtrace.Exn.most_recent ()));
-        Lwt.return ()
+      with e -> show_exn notify_back e
 
     (* Do not use incremental update, to work around a bug in lsp 1.14 where its
        content change application logic is confused when the newline code is CRLF. *)
@@ -44,30 +56,35 @@ class lsp_server ain_path =
       }
 
     method! on_req_initialize ~notify_back i =
-      (if not (String.is_empty ain_path) then
-         try
-           ain <- Ain.load ain_path;
-           log_info notify_back (ain_path ^ " loaded")
-         with e -> log_error notify_back (Exn.to_string e));
+      let* () =
+        if not (String.is_empty ain_path) then
+          try
+            ain <- Ain.load ain_path;
+            notify_back#send_log_msg ~type_:Lsp.Types.MessageType.Info
+              (ain_path ^ " loaded")
+          with e -> show_exn notify_back e
+        else Lwt.return ()
+      in
       super#on_req_initialize ~notify_back i
 
-    method on_notif_doc_did_open ~notify_back d ~content : unit Linol_lwt.t =
+    method on_notif_doc_did_open ~notify_back d ~content =
       self#_on_doc ~notify_back d.uri content
 
     method on_notif_doc_did_change ~notify_back d _c ~old_content:_old
         ~new_content =
       self#_on_doc ~notify_back d.uri new_content
 
-    method on_notif_doc_did_close ~notify_back:_ d : unit Linol_lwt.t =
+    method on_notif_doc_did_close ~notify_back:_ d =
       Hashtbl.remove buffers (Lsp.Types.DocumentUri.to_string d.uri);
-      Linol_lwt.return ()
+      Lwt.return ()
 
     method! config_hover = Some (`Bool true)
 
     method! on_req_hover ~notify_back:_ ~id:_ ~uri ~pos ~workDoneToken:_ _ =
-      match Hashtbl.find buffers (Lsp.Types.DocumentUri.to_string uri) with
-      | Some doc -> Linol_lwt.return (Hover.get_hover doc pos)
-      | None -> Linol_lwt.return None
+      (match Hashtbl.find buffers (Lsp.Types.DocumentUri.to_string uri) with
+      | Some doc -> Hover.get_hover doc pos
+      | None -> None)
+      |> Lwt.return
   end
 
 let run ain =
