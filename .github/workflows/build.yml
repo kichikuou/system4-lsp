@@ -1,0 +1,57 @@
+name: Build
+
+on:
+  - pull_request
+  - push
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - ubuntu-latest
+          - windows-latest
+        ocaml-compiler:
+          - 4.14.x
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      # Workaround for ppx_expect test failure on Windows
+      - name: Set git to use LF
+        if: matrix.os == 'windows-latest'
+        run: |
+          git config --global core.autocrlf false
+
+      - uses: actions/checkout@v3
+        with:
+          submodules: true
+
+      - name: Setup OCaml
+        uses: ocaml/setup-ocaml@v2
+        with:
+          ocaml-compiler: ${{ matrix.ocaml-compiler }}
+          dune-cache: true
+
+      - name: Install dependencies
+        run: opam install . --deps-only --with-test
+
+      - name: Build
+        run: opam exec -- dune build
+
+      - name: Run tests
+        run: opam exec -- dune runtest
+
+      - name: Copy the build artifact
+        shell: bash
+        run: |
+          mkdir -p dist/system4-lsp
+          cp _build/default/bin/main.exe dist/system4-lsp/system4-lsp${{ matrix.os == 'windows-latest' && '.exe' || '' }}
+          cp README.md COPYING dist/system4-lsp/
+
+      - name: Upload the build artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: system4-lsp-${{ matrix.os }}
+          path: dist/system4-lsp

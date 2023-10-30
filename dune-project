@@ -26,6 +26,7 @@
   core
   camlzip
   dune
+  dune-build-info
   menhir
   ;; linol dependencies
   (lsp (and (>= 1.14) (< 1.15)))
