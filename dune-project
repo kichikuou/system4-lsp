@@ -1,6 +1,8 @@
 (lang dune 3.0)
 (using menhir 2.1)
+
 (name system4_lsp)
+(version 0.0.0)
 
 (generate_opam_files true)
 

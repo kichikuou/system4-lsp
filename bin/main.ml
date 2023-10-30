@@ -93,11 +93,23 @@ let run ain =
   let task = Linol_lwt.Jsonrpc2.run server in
   Linol_lwt.run task
 
+let print_version () =
+  Stdio.printf "system4-lsp %s\n"
+    (match Build_info.V1.version () with
+    | None -> "n/a"
+    | Some v -> Build_info.V1.Version.to_string v);
+  Stdlib.exit 0
+
 let () =
   let ain = ref "" in
   let usage_msg = "Usage: system4-lsp --ain <file>" in
   let speclist =
-    [ ("--ain", Stdlib.Arg.Set_string ain, ".ain file to load") ]
+    [
+      ("--ain", Stdlib.Arg.Set_string ain, ".ain file to load");
+      ( "--version",
+        Stdlib.Arg.Unit print_version,
+        "Display version information and exit" );
+    ]
   in
   let anon_fun s =
     Stdlib.Arg.usage speclist

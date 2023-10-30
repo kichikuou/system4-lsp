@@ -1,4 +1,4 @@
 (executable
  (public_name system4-lsp)
  (name main)
- (libraries system4_lsp linol-lwt))
+ (libraries system4_lsp linol-lwt dune-build-info))
