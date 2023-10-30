@@ -76,7 +76,7 @@ let make_error ain lexbuf exn =
     (range, message)
   in
   match exn with
-  | Parser.Error -> make lexbuf None "Syntax error."
+  | Lexer.Error | Parser.Error -> make lexbuf None "Syntax error."
   | CompileError.CompileError (msg, node) -> make lexbuf (Some node) msg
   | CompileError.Undefined_variable (name, node) ->
       make lexbuf (Some node) ("Undefined variable: " ^ name)
