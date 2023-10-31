@@ -15,21 +15,23 @@ System 4 programming language.
 
 ## Installation
 
-To build and install `system4-lsp`` from source code, you need to have OCaml
-and opam installed. Then, run the following commands:
+To build and install `system4-lsp` from source code, you need to have OCaml and
+opam installed. Then, run the following commands:
 
 ```sh
 $ git clone https://github.com/kichikuou/system4-lsp.git
 $ cd system4-lsp
-$ opam install .
+$ opam install . --deps-only --with-test
+$ dune build
+$ dune install
 ```
 
 ## Usage
 
 You don't need to run `system4-lsp` manually, as your editor should do that for
 you. If you're using Visual Studio Code, you can install the
-[System4 language extension](https://github.com/kichikuou/vscode-system4) to
-get started.
+[System4 language extension](https://marketplace.visualstudio.com/items?itemName=kichikuou.system4)
+to get started.
 
 ## Limitations
 
@@ -41,4 +43,5 @@ with the System4 SDK.
 ## Credits
 
 System4-lsp is derived from the
-[sys4c compiler](https://github.com/nunuhara/sys4c) created by @nunuhara.
+[sys4c compiler](https://github.com/nunuhara/sys4c) created by
+[@nunuhara](https://github.com/nunuhara).
