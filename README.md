@@ -15,6 +15,12 @@ System 4 programming language.
 
 ## Installation
 
+### Windows
+
+Download the latest release from [Releases](https://github.com/kichikuou/system4-lsp/releases) page.
+
+### Other Platforms
+
 To build and install `system4-lsp` from source code, you need to have OCaml and
 opam installed. Then, run the following commands:
 
