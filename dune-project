@@ -23,11 +23,13 @@
  (description "A language server for AliceSoft's System4 language.")
  (depends
   ocaml
-  core
+  base
+  stdio
   camlzip
   dune
   dune-build-info
   menhir
+  (ppx_expect :with-test)
   ;; linol dependencies
   (lsp (and (>= 1.14) (< 1.15)))
   lwt

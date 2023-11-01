@@ -14,7 +14,7 @@
  * along with this program; if not, see <http://gnu.org/licenses/>.
  *)
 
-open Core
+open Base
 open Printf
 
 type unary_op =
@@ -584,9 +584,9 @@ let rec expr_to_string (e : expression) =
   in
   match e.node with
   | ConstInt (i) ->
-      string_of_int i
+      Int.to_string i
   | ConstFloat (f) ->
-      string_of_float f
+      Float.to_string f
   | ConstChar (s) ->
       sprintf "'%s'" s
   | ConstString (s) ->

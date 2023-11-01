@@ -11,11 +11,13 @@ doc: "https://github.com/kichikuou/system4-lsp"
 bug-reports: "https://github.com/kichikuou/system4-lsp/issues"
 depends: [
   "ocaml"
-  "core"
+  "base"
+  "stdio"
   "camlzip"
   "dune" {>= "3.0"}
   "dune-build-info"
   "menhir"
+  "ppx_expect" {with-test}
   "lsp" {>= "1.14" & < "1.15"}
   "lwt"
   "logs"
