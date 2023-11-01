@@ -60,4 +60,4 @@ jobs:
         uses: actions/upload-artifact@v3
         with:
           name: system4-lsp-${{ matrix.os }}
-          path: dist/system4-lsp
+          path: dist
