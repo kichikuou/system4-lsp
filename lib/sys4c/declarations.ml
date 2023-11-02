@@ -193,7 +193,7 @@ class type_define_visitor ctx = object
         | Some Const ->
             ctx.const_vars <- g::ctx.const_vars  (* FIXME: replace existing entry *)
         | _ ->
-            Ain.set_global_type ctx.ain g.name (jaf_to_ain_type g.type_spec)
+            Ain.set_global_type_loc ctx.ain g.name (jaf_to_ain_type g.type_spec) g.location
         end
     | Function (f) ->
         let obj = Ain.get_function_by_index ctx.ain (Option.value_exn f.index) in

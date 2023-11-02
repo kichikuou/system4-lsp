@@ -13,3 +13,14 @@ let get_hover doc pos =
                (Lsp.Types.MarkupContent.create ~kind:PlainText ~value:content))
            ~range ())
   | _ -> None
+
+let get_definition doc pos =
+  match Document.get_nodes_for_pos doc pos with
+  | Jaf.ASTExpression { node = Ident (_, Some (GlobalVariable i)); _ } :: _ -> (
+      match (Ain.get_global_by_index doc.ctx.ain i).location with
+      | Some loc ->
+          let range = Document.to_lsp_range doc.text loc in
+          let uri = Lsp.Types.DocumentUri.of_path (fst loc).pos_fname in
+          Some (`Location [ Lsp.Types.Location.create ~uri ~range ])
+      | None -> None)
+  | _ -> None

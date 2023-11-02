@@ -102,8 +102,9 @@ let make_error ain lexbuf exn =
            func.nr_args (List.length args))
   | e -> reraise e
 
-let create ain text =
+let create ain ~fname text =
   let lexbuf = Lexing.from_string text in
+  Lexing.set_filename lexbuf fname;
   let ctx =
     Jaf.{ ain; import_ain = Ain.create 4 0; const_vars = predefined_constants }
   in

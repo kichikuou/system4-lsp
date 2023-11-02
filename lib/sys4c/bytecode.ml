@@ -1231,7 +1231,8 @@ let function_of_syscall sys =
           name = "";
           name2 = Some "";
           value_type = t;
-          initval = None
+          initval = None;
+          location = None;
         }
       in
       r
@@ -1413,7 +1414,8 @@ let function_of_builtin builtin t_param =
           name = "";
           name2 = Some "";
           value_type = t;
-          initval = None
+          initval = None;
+          location = None;
         }
       in
       r

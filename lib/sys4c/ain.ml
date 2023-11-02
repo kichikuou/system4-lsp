@@ -4,6 +4,8 @@ let sprintf = Printf.sprintf
 module In_channel = Stdio.In_channel
 module Out_channel = Stdio.Out_channel
 
+type jaf_location = Lexing.position * Lexing.position
+
 module Type = struct
   type data =
     | Void
@@ -383,11 +385,12 @@ module Variable = struct
     name : string;
     name2 : string option;
     value_type : Type.t;
-    initval : initval option
+    initval : initval option;
+    location : jaf_location option;
   }
 
   let make ?(index=(-1)) name value_type =
-    { index; name; name2=Some ""; value_type; initval=None }
+    { index; name; name2=Some ""; value_type; initval=None; location=None }
 
   let equal a b =
     (String.equal a.name b.name)
@@ -771,7 +774,7 @@ let read_variables buf count =
       let name2 = if_version_gte buf.ain (12, 0) read_some_cstring None buf in
       let value_type = read_variable_type buf in
       let initval = if_version_gte buf.ain (8, 0) (read_initval value_type) None buf in
-      let (v:Variable.t) = { index; name; name2; value_type; initval } in
+      let (v:Variable.t) = { index; name; name2; value_type; initval; location=None } in
       read_variables' (count - 1) (index + 1) (v::result)
     end else
       List.rev result
@@ -825,7 +828,7 @@ let read_globals buf count =
       let name2 = if_version_gte buf.ain (12, 0) read_some_cstring None buf in
       let value_type = read_variable_type buf in
       let group_index = if_version_gte buf.ain (5, 0) read_int 0 buf in
-      let (variable:Variable.t) = { index; name; name2; value_type; initval=None } in
+      let (variable:Variable.t) = { index; name; name2; value_type; initval=None; location=None } in
       let (global:Global.t) = { variable; group_index } in
       read_globals' (count - 1) (index + 1) (global::result)
     end else
@@ -1573,10 +1576,10 @@ let get_globali ain name =
 let get_global_by_index ain no =
   ain.globals.(no).variable
 
-let set_global_type ain name t =
+let set_global_type_loc ain name t loc =
   match get_globali ain name with
   | Some (i, g) ->
-      Array.set ain.globals i { g with variable = { g.variable with value_type = t } }
+      Array.set ain.globals i { g with variable = { g.variable with value_type = t; location = Some loc } }
   | None -> failwith (sprintf "No global named '%s' in ain object" name)
 
 (* FIXME: this sucks *)
@@ -1697,7 +1700,7 @@ let add_library ain name =
 let function_of_hll_function_index ain lib_no fun_no : Function.t =
   let lib_fun = List.nth_exn ain.libraries.(lib_no).functions fun_no in
   let var_of_hll_arg index (arg : Library.Argument.t) : Variable.t =
-    { index; name=arg.name; name2=None; value_type=arg.value_type; initval=None }
+    { index; name=arg.name; name2=None; value_type=arg.value_type; initval=None; location=None }
   in
   { index = -1;
     name = lib_fun.name;

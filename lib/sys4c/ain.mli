@@ -4,6 +4,8 @@ val minor_version : t -> int
 val version_gte : t -> int * int -> bool
 val version_lt : t -> int * int -> bool
 
+type jaf_location = Lexing.position * Lexing.position
+
 module Type : sig
   type data =
       Void
@@ -47,6 +49,7 @@ module Variable : sig
     name2 : string option;
     value_type : Type.t;
     initval : initval option;
+    location : jaf_location option;
   }
   val make : ?index:int -> string -> Type.t -> t
   val equal : t -> t -> bool
@@ -154,7 +157,7 @@ val variable_to_string_hum : t -> Variable.t -> string
 
 val get_global : t -> string -> Variable.t option
 val get_global_by_index : t -> int -> Variable.t
-val set_global_type : t -> string -> Type.t -> unit
+val set_global_type_loc : t -> string -> Type.t -> jaf_location -> unit
 val write_new_global : t -> Variable.t -> int
 val add_global : t -> string -> int
 

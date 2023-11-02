@@ -40,7 +40,11 @@ class lsp_server ain_path =
     method private _on_doc ~(notify_back : Linol_lwt.Jsonrpc2.notify_back)
         (uri : Lsp.Types.DocumentUri.t) (contents : string) =
       try
-        let doc = Document.create ain contents in
+        let doc =
+          Document.create ain
+            ~fname:(Lsp.Types.DocumentUri.to_path uri)
+            contents
+        in
         Hashtbl.set buffers ~key:(Lsp.Types.DocumentUri.to_string uri) ~data:doc;
         notify_back#send_diagnostic
           (List.map doc.errors ~f:(fun (range, message) ->
@@ -82,7 +86,16 @@ class lsp_server ain_path =
 
     method! on_req_hover ~notify_back:_ ~id:_ ~uri ~pos ~workDoneToken:_ _ =
       (match Hashtbl.find buffers (Lsp.Types.DocumentUri.to_string uri) with
-      | Some doc -> Hover.get_hover doc pos
+      | Some doc -> RequestHandlers.get_hover doc pos
+      | None -> None)
+      |> Lwt.return
+
+    method! config_definition = Some (`Bool true)
+
+    method! on_req_definition ~notify_back:_ ~id:_ ~uri ~pos ~workDoneToken:_
+        ~partialResultToken:_ _ =
+      (match Hashtbl.find buffers (Lsp.Types.DocumentUri.to_string uri) with
+      | Some doc -> RequestHandlers.get_definition doc pos
       | None -> None)
       |> Lwt.return
   end

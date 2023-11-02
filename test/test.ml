@@ -3,7 +3,7 @@ open Sys4c
 open System4_lsp
 
 let analyze source =
-  let doc = Document.create (Ain.create 4 0) source in
+  let doc = Document.create (Ain.create 4 0) ~fname:"test.jaf" source in
   if List.is_empty doc.errors then Stdio.print_endline "ok"
   else
     List.iter doc.errors ~f:(fun (range, message) ->
