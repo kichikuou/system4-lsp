@@ -25,7 +25,7 @@ To build and install `system4-lsp` from source code, you need to have OCaml and
 opam installed. Then, run the following commands:
 
 ```sh
-$ git clone https://github.com/kichikuou/system4-lsp.git
+$ git clone --recursive https://github.com/kichikuou/system4-lsp.git
 $ cd system4-lsp
 $ opam install . --deps-only --with-test
 $ dune build

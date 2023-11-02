@@ -145,7 +145,7 @@ end
 
 val create : int -> int -> t
 val load : string -> t
-val write : ?raw:bool -> t -> Out_channel.t -> unit
+val write : ?raw:bool -> t -> Stdio.Out_channel.t -> unit
 val write_file : t -> string -> unit
 
 val type_to_string_hum : t -> Type.t -> string
