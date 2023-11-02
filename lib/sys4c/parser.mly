@@ -473,8 +473,8 @@ struct_declaration
     { decls $1 $2 |> List.map (fun d -> MemberDecl (d)) }
   | declaration_specifiers IDENTIFIER parameter_list opt_body
     { [Method (func $sloc $1 $2 $3 $4)] }
-  | IDENTIFIER LPAREN RPAREN opt_body
-    { [Constructor (func $sloc {data=Void; qualifier=None} $1 [] $4)] }
+  | IDENTIFIER LPAREN VOID? RPAREN opt_body
+    { [Constructor (func $sloc {data=Void; qualifier=None} $1 [] $5)] }
   | BITNOT IDENTIFIER LPAREN RPAREN opt_body
     { [Destructor (func $sloc {data=Void; qualifier=None} $2 [] $5)] }
   ;
