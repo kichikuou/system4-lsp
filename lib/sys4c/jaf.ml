@@ -849,9 +849,10 @@ let jaf_to_ain_struct j_s (a_s:Ain.Struct.t) =
   { a_s with
     members; 
     constructor;
-    destructor
+    destructor;
     (* TODO: interfaces *)
     (* TODO: vmethods *)
+    location = Some j_s.loc;
   }
 
 let jaf_to_ain_functype j_f (a_f:Ain.FunctionType.t) =
@@ -860,6 +861,7 @@ let jaf_to_ain_functype j_f (a_f:Ain.FunctionType.t) =
     variables;
     nr_arguments = List.length variables;
     return_type = jaf_to_ain_type j_f.return.spec;
+    location = Some j_f.loc;
   }
 
 let jaf_to_ain_hll_function j_f =

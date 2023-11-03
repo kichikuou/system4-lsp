@@ -95,6 +95,7 @@ module Struct : sig
     destructor : int;
     members : Variable.t list;
     vmethods : int list;
+    location : jaf_location option;
   }
   val equal : t -> t -> bool
 end
@@ -141,6 +142,7 @@ module FunctionType : sig
     return_type : Type.t;
     nr_arguments : int;
     variables : Variable.t list;
+    location : jaf_location option;
   }
   val logical_parameters : t -> Variable.t list
   val function_compatible : t -> Function.t -> bool

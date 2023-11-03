@@ -157,6 +157,12 @@ class ast_locator (doc : t) (pos : Lsp.Types.Position.t) =
       if range_contains doc.text (Jaf.ast_node_pos node) pos then (
         nodes <- node :: nodes;
         super#visit_declaration decl)
+
+    method! visit_type_specifier t =
+      let node = Jaf.ASTType t in
+      if range_contains doc.text (Jaf.ast_node_pos node) pos then (
+        nodes <- node :: nodes;
+        super#visit_type_specifier t)
   end
 
 (* Returns the most specific node first. *)

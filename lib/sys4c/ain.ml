@@ -474,7 +474,8 @@ module Struct = struct
     constructor : int;
     destructor : int;
     members : Variable.t list;
-    vmethods : int list
+    vmethods : int list;
+    location : jaf_location option;
   }
 
   let create ?(index=(-1)) name = {
@@ -484,7 +485,8 @@ module Struct = struct
     constructor = -1;
     destructor = -1;
     members = [];
-    vmethods = []
+    vmethods = [];
+    location = None;
   }
 
   let equal a b =
@@ -569,7 +571,8 @@ module FunctionType = struct
     name : string;
     return_type : Type.t;
     nr_arguments : int;
-    variables : Variable.t list
+    variables : Variable.t list;
+    location : jaf_location option;
   }
 
   let create name = {
@@ -577,7 +580,8 @@ module FunctionType = struct
     name;
     return_type = Type.make Void;
     nr_arguments = 0;
-    variables = []
+    variables = [];
+    location = None;
   }
 
   let logical_parameters f =
@@ -885,7 +889,8 @@ let read_structures buf count =
       let members = read_variables buf nr_members in
       let nr_vmethods = if_version_gte buf.ain (14, 1) read_int 0 buf in
       let vmethods = read_vmethods nr_vmethods [] in
-      let (s:Struct.t) = { index; name; interfaces; constructor; destructor; members; vmethods } in
+      let location = None in
+      let (s:Struct.t) = { index; name; interfaces; constructor; destructor; members; vmethods; location } in
       read_structures' (count - 1) (s::result) (index + 1)
     end else
       List.rev result
@@ -993,7 +998,8 @@ let read_function_types buf count =
       let nr_arguments = read_int buf in
       let nr_variables = read_int buf in
       let variables = read_variables buf nr_variables in
-      let (ft:FunctionType.t) = { index; name; return_type; nr_arguments; variables } in
+      let location = None in
+      let (ft:FunctionType.t) = { index; name; return_type; nr_arguments; variables; location } in
       read_function_types' (count - 1) (index + 1) (ft::result)
     end else
       List.rev result
