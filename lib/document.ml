@@ -34,13 +34,19 @@ let range_contains text range (pos : Lsp.Types.Position.t) =
   && (end_.line > pos.line
      || (end_.line = pos.line && end_.character >= pos.character))
 
+let dummy_loc = (Lexing.dummy_pos, Lexing.dummy_pos)
+
 let predefined_constants =
   [
     Jaf.
       {
         name = "true";
-        type_spec = { data = Bool; qualifier = Some Const };
-        location = (Lexing.dummy_pos, Lexing.dummy_pos);
+        type_ =
+          {
+            spec = { data = Bool; qualifier = Some Const };
+            location = dummy_loc;
+          };
+        location = dummy_loc;
         array_dim = [];
         initval = None;
         index = None;
@@ -48,8 +54,12 @@ let predefined_constants =
     Jaf.
       {
         name = "false";
-        type_spec = { data = Bool; qualifier = Some Const };
-        location = (Lexing.dummy_pos, Lexing.dummy_pos);
+        type_ =
+          {
+            spec = { data = Bool; qualifier = Some Const };
+            location = dummy_loc;
+          };
+        location = dummy_loc;
         array_dim = [];
         initval = None;
         index = None;

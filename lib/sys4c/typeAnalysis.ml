@@ -206,7 +206,7 @@ class type_analyze_visitor ctx = object (self)
       | Ident (name, _) ->
           begin match environment#resolve name with
           | ResolvedLocal v ->
-              begin match v.type_spec.qualifier with
+              begin match v.type_.spec.qualifier with
               | Some Ref ->
                   ref_type_check parent (Option.value_exn lhs.valuetype).data rhs
               | _ ->
@@ -275,10 +275,10 @@ class type_analyze_visitor ctx = object (self)
         begin match environment#resolve name with
         | ResolvedLocal v ->
             expr.node <- Ident (name, Some (LocalVariable (-1)));
-            set_valuetype { data=v.type_spec.data; qualifier=None }
+            set_valuetype { data=v.type_.spec.data; qualifier=None }
         | ResolvedConstant v ->
             expr.node <- Ident (name, Some GlobalConstant);
-            set_valuetype { data=v.type_spec.data; qualifier=None }
+            set_valuetype { data=v.type_.spec.data; qualifier=None }
         | ResolvedGlobal g ->
             expr.node <- Ident (name, Some (GlobalVariable (g.index)));
             expr.valuetype <- Some g.value_type
@@ -602,21 +602,21 @@ class type_analyze_visitor ctx = object (self)
           begin match environment#current_function with
           | None -> compiler_bug "return statement outside of function" (Some(ASTStatement stmt))
           | Some f ->
-              begin match f.return.qualifier with
+              begin match f.return.spec.qualifier with
               | Some Ref -> begin
                 self#check_referenceable e (ASTExpression e);
-                ref_type_check (ASTStatement stmt) (jaf_to_ain_data_type f.return.data) e
+                ref_type_check (ASTStatement stmt) (jaf_to_ain_data_type f.return.spec.data) e
               end
-              | _ -> self#check_assign (ASTStatement stmt) (jaf_to_ain_data_type f.return.data) e
+              | _ -> self#check_assign (ASTStatement stmt) (jaf_to_ain_data_type f.return.spec.data) e
               end
           end
       | Return (None) ->
           begin match environment#current_function with
           | None -> compiler_bug "return statement outside of function" (Some(ASTStatement stmt))
           | Some f ->
-              begin match f.return.data with
+              begin match f.return.spec.data with
               | Void -> ()
-              | _ -> data_type_error (jaf_to_ain_data_type f.return.data) None (ASTStatement stmt)
+              | _ -> data_type_error (jaf_to_ain_data_type f.return.spec.data) None (ASTStatement stmt)
               end
           end
       | MessageCall _ -> ()
@@ -634,7 +634,7 @@ class type_analyze_visitor ctx = object (self)
       | Array sub_t -> 1 + (calculate_array_rank sub_t)
       | _ -> 0
     in
-    let rank = calculate_array_rank var.type_spec in
+    let rank = calculate_array_rank var.type_.spec in
     let nr_dims = List.length var.array_dim in
     (* Only one array dimension may be specified in ain v11+ *)
     if (nr_dims > 1) && (Ain.version_gte ctx.ain (11, 0)) then
@@ -650,12 +650,12 @@ class type_analyze_visitor ctx = object (self)
     (* Check initval matches declared type *)
     begin match var.initval with
     | Some expr ->
-        begin match var.type_spec.qualifier with
+        begin match var.type_.spec.qualifier with
         | Some Ref ->
             self#check_referenceable expr (ASTVariable var);
-            ref_type_check (ASTVariable var) (jaf_to_ain_data_type var.type_spec.data) expr
+            ref_type_check (ASTVariable var) (jaf_to_ain_data_type var.type_.spec.data) expr
         | _ ->
-            self#check_assign (ASTVariable var) (jaf_to_ain_data_type var.type_spec.data) expr
+            self#check_assign (ASTVariable var) (jaf_to_ain_data_type var.type_.spec.data) expr
         end
     | None -> ()
     end
@@ -674,22 +674,22 @@ class type_analyze_visitor ctx = object (self)
 
   method! visit_fundecl f =
     super#visit_fundecl f;
-    begin match f.return.qualifier with
+    begin match f.return.spec.qualifier with
     | Some Const ->
         compile_error "Function cannot be declared const" (ASTDeclaration(Function f))
     | _ -> ()
     end;
     if String.equal f.name "main" then
-      begin match (f.return, f.params) with
+      begin match (f.return.spec, f.params) with
       | ({data=Int; qualifier=None}, []) ->
           Ain.set_main_function ctx.ain (Option.value_exn f.index)
       | _ ->
           compile_error "Invalid declaration of 'main' function" (ASTDeclaration(Function f))
       end
     else if String.equal f.name "message" then
-      begin match f.return with
+      begin match f.return.spec with
       | {data=Void; qualifier=None} ->
-          begin match List.map f.params ~f:(fun v -> v.type_spec) with
+          begin match List.map f.params ~f:(fun v -> v.type_.spec) with
           | [{data=Int; qualifier=None}; {data=Int; qualifier=None}; {data=String; qualifier=None}] ->
               Ain.set_message_function ctx.ain (Option.value_exn f.index)
           | _ ->

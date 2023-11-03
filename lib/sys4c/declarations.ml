@@ -35,7 +35,7 @@ class type_declare_visitor ctx = object (self)
   method! visit_declaration decl =
     match decl with
     | Global (g) ->
-        begin match g.type_spec.qualifier with
+        begin match g.type_.spec.qualifier with
         | Some Const -> ()
         | _ ->
             g.index <- Some (match Ain.get_global ctx.ain g.name with
@@ -138,7 +138,7 @@ class type_resolve_visitor ctx decl_only = object (self)
     super#visit_expression expr
 
   method! visit_local_variable decl =
-    self#resolve_typespec decl.type_spec (ASTVariable decl);
+    self#resolve_typespec decl.type_.spec (ASTVariable decl);
     super#visit_local_variable decl
 
   method! visit_declaration decl =
@@ -148,8 +148,8 @@ class type_resolve_visitor ctx decl_only = object (self)
       | _ -> None
     in
     let resolve_function f =
-      self#resolve_typespec f.return (ASTDeclaration(Function f));
-      List.iter f.params ~f:(fun v -> self#resolve_typespec v.type_spec (ASTVariable v))
+      self#resolve_typespec f.return.spec (ASTDeclaration(Function f));
+      List.iter f.params ~f:(fun v -> self#resolve_typespec v.type_.spec (ASTVariable v))
     in
     begin match decl with
     | Function (f) ->
@@ -158,12 +158,12 @@ class type_resolve_visitor ctx decl_only = object (self)
     | FuncTypeDef (f) | DelegateDef (f) ->
         resolve_function f
     | Global (g) ->
-        self#resolve_typespec g.type_spec (ASTDeclaration decl)
+        self#resolve_typespec g.type_.spec (ASTDeclaration decl)
     | StructDef (s) ->
         let resolve_structdecl = function
           | AccessSpecifier _ -> ()
           | MemberDecl (d) ->
-              self#resolve_typespec d.type_spec (ASTDeclaration decl)
+              self#resolve_typespec d.type_.spec (ASTDeclaration decl)
           | Constructor (f)
           | Destructor (f)
           | Method (f) ->
@@ -189,11 +189,11 @@ class type_define_visitor ctx = object
   method! visit_declaration decl =
     match decl with
     | Global (g) ->
-        begin match g.type_spec.qualifier with
+        begin match g.type_.spec.qualifier with
         | Some Const ->
             ctx.const_vars <- g::ctx.const_vars  (* FIXME: replace existing entry *)
         | _ ->
-            Ain.set_global_type_loc ctx.ain g.name (jaf_to_ain_type g.type_spec) g.location
+            Ain.set_global_type_loc ctx.ain g.name (jaf_to_ain_type g.type_.spec) g.location
         end
     | Function (f) ->
         let obj = Ain.get_function_by_index ctx.ain (Option.value_exn f.index) in

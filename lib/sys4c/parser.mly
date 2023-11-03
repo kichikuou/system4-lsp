@@ -21,6 +21,8 @@ open Jaf
 let qtype qualifier data =
   { data=data; qualifier=qualifier }
 
+let implicit_void pos = { spec=qtype None Void; location=(pos, pos) }
+
 let expr loc ast =
   { valuetype=None; node=ast; loc }
 
@@ -34,24 +36,28 @@ type varinit = {
   initval: expression option;
 }
 
-let decl typespec vi =
-  { name=vi.name; location=vi.loc; array_dim=vi.dims; type_spec=typespec; initval=vi.initval; index=None }
+let decl type_ vi =
+  { name=vi.name; location=vi.loc; array_dim=vi.dims; type_; initval=vi.initval; index=None }
 
 let decls typespec var_list =
   List.map (decl typespec) var_list
 
-let func loc typespec name params body =
+let func loc type_ name params body =
   (* XXX: hack for `functype name(void)` *)
   let plist =
     match params with
-    | [{ type_spec={data=Void; _}; _}] -> []
+    | [{ type_={spec={data=Void; _}; _}; _}] -> []
     | _ -> params
   in
-  { name; loc; struct_name=None; return=typespec; params=plist; body; is_label=false; index=None; class_index=None; super_index=None }
+  { name; loc; struct_name=None; return=type_; params=plist; body; is_label=false; index=None; class_index=None; super_index=None }
 
-let member_func loc typespec_opt struct_name is_dtor name params body =
+let member_func loc type_opt struct_name is_dtor name params body =
   let name = if is_dtor then "~" ^ name else name in
-  let fundecl = func loc (Option.value typespec_opt ~default:(qtype None Void)) name params body in
+  let type_ = match type_opt with
+    | Some type_ -> type_
+    | None -> implicit_void (fst loc)
+  in
+  let fundecl = func loc type_ name params body in
   { fundecl with struct_name=Some struct_name }
 
 let rec multidim_array dims t =
@@ -384,8 +390,8 @@ declaration
   ;
 
 declaration_specifiers
-  : type_qualifier type_specifier { qtype (Some $1) $2 }
-  | type_specifier { qtype None $1 }
+  : type_qualifier type_specifier { { location = $sloc; spec = qtype (Some $1) $2 } }
+  | type_specifier { { location = $sloc; spec = qtype None $1 } }
   ;
 
 init_declarator
@@ -412,7 +418,7 @@ external_declaration
   | ioption(declaration_specifiers) IDENTIFIER COCO boption(BITNOT) IDENTIFIER parameter_list block
     { [Function (member_func $sloc $1 $2 $4 $5 $6 (Some $7))] }
   | HASH IDENTIFIER parameter_list block
-    { [Function { (func $sloc (qtype None Void) $2 $3 (Some $4)) with is_label=true }] }
+    { [Function { (func $sloc (implicit_void $symbolstartpos) $2 $3 (Some $4)) with is_label=true }] }
   | FUNCTYPE declaration_specifiers IDENTIFIER functype_parameter_list SEMICOLON
     { [FuncTypeDef (func $sloc $2 $3 $4 None)] }
   | DELEGATE declaration_specifiers IDENTIFIER functype_parameter_list SEMICOLON
@@ -474,9 +480,9 @@ struct_declaration
   | declaration_specifiers IDENTIFIER parameter_list opt_body
     { [Method (func $sloc $1 $2 $3 $4)] }
   | IDENTIFIER LPAREN VOID? RPAREN opt_body
-    { [Constructor (func $sloc {data=Void; qualifier=None} $1 [] $5)] }
+    { [Constructor (func $sloc (implicit_void $symbolstartpos) $1 [] $5)] }
   | BITNOT IDENTIFIER LPAREN RPAREN opt_body
-    { [Destructor (func $sloc {data=Void; qualifier=None} $2 [] $5)] }
+    { [Destructor (func $sloc (implicit_void $symbolstartpos) $2 [] $5)] }
   ;
 
 opt_body

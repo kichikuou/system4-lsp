@@ -67,7 +67,11 @@ type type_qualifier =
   | Const
   | Ref
 
-type type_specifier = {
+type ast_type = {
+  spec : type_specifier;
+  location : Lexing.position * Lexing.position;
+}
+and type_specifier = {
   mutable data : data_type;
   qualifier    : type_qualifier option
 }
@@ -169,7 +173,7 @@ and variable = {
   name      : string;
   location  : Lexing.position * Lexing.position;
   array_dim : expression list;
-  type_spec : type_specifier;
+  type_     : ast_type;
   initval   : expression option;
   mutable index : int option
 }
@@ -178,7 +182,7 @@ type fundecl = {
   mutable name : string;
   loc: Lexing.position * Lexing.position;
   struct_name : string option;
-  return : type_specifier;
+  return : ast_type;
   params : variable list;
   body : statement list option;
   is_label: bool;
@@ -222,6 +226,7 @@ type ast_node =
   | ASTStatement of statement
   | ASTVariable of variable
   | ASTDeclaration of declaration
+  | ASTType of ast_type
 
 let ast_node_pos = function
   | ASTExpression e -> e.loc
@@ -236,6 +241,7 @@ let ast_node_pos = function
       | StructDef s -> s.loc
       | Enum e -> e.loc
       end
+  | ASTType t -> t.location
 
 type context = {
   ain : Ain.t;
@@ -461,17 +467,21 @@ class ivisitor ctx = object (self)
       self#visit_expression b
 
   method visit_local_variable v =
+    self#visit_type_specifier v.type_;
     List.iter v.array_dim ~f:self#visit_expression;
     Option.iter v.initval ~f:self#visit_expression;
     environment#push_var v
 
   method visit_fundecl f =
+    self#visit_type_specifier f.return;
+    List.iter f.params ~f:(fun p -> self#visit_type_specifier p.type_);
     environment#enter_function f;
     Option.iter f.body ~f:(List.iter ~f:self#visit_statement);
     environment#leave_function
 
   method visit_declaration d =
     let visit_vardecl d =
+      self#visit_type_specifier d.type_;
       List.iter d.array_dim ~f:self#visit_expression;
       Option.iter d.initval ~f:self#visit_expression
     in
@@ -493,6 +503,9 @@ class ivisitor ctx = object (self)
     | Enum (enum) ->
         let visit_enumval (_, expr) = Option.iter expr ~f:self#visit_expression in
         List.iter enum.values ~f:visit_enumval
+
+  method visit_type_specifier (_t : ast_type) =
+    ()
 
   method visit_toplevel decls =
     List.iter decls ~f:self#visit_declaration
@@ -679,7 +692,7 @@ let rec stmt_to_string (stmt : statement) =
   | ObjSwap (a, b) ->
     sprintf "%s <=> %s;" (expr_to_string a) (expr_to_string b)
 and var_to_string' d =
-  let t = type_spec_to_string d.type_spec in
+  let t = type_spec_to_string d.type_.spec in
   let dim_iter l r = l ^ (sprintf "[%s]" (expr_to_string r)) in
   let dims = List.fold d.array_dim ~init:"" ~f:dim_iter in
   let init =
@@ -709,16 +722,16 @@ let decl_to_string d =
   | Global (d) ->
       var_to_string d
   | Function (d) ->
-      let return = type_spec_to_string d.return in
+      let return = type_spec_to_string d.return.spec in
       let params = params_to_string d.params in
       let body = block_to_string d.body in
       sprintf "%s %s%s { %s }" return d.name params body
   | FuncTypeDef (d) ->
-      let return = type_spec_to_string d.return in
+      let return = type_spec_to_string d.return.spec in
       let params = params_to_string d.params in
       sprintf "functype %s %s%s;" return d.name params
   | DelegateDef (d) ->
-      let return = type_spec_to_string d.return in
+      let return = type_spec_to_string d.return.spec in
       let params = params_to_string d.params in
       sprintf "delegate %s %s%s;" return d.name params
   | StructDef (d) ->
@@ -736,7 +749,7 @@ let decl_to_string d =
             let body = block_to_string d.body in
             sprintf "~%s%s { %s }" d.name params body
         | Method (d) ->
-            let return = type_spec_to_string d.return in
+            let return = type_spec_to_string d.return.spec in
             let params = params_to_string d.params in
             let body = block_to_string d.body in
             sprintf "%s %s%s { %s }" return d.name params body
@@ -762,6 +775,7 @@ let ast_to_string = function
   | ASTStatement (s) -> stmt_to_string s
   | ASTVariable (v) -> var_to_string v
   | ASTDeclaration (d) -> decl_to_string d
+  | ASTType (t) -> type_spec_to_string t.spec
 
 let rec jaf_to_ain_data_type data =
   match data with
@@ -794,8 +808,8 @@ let jaf_to_ain_variables j_p =
     match params with
     | [] -> List.rev result
     | x::xs ->
-        let var = Ain.Variable.make ~index x.name (jaf_to_ain_type x.type_spec) in
-        begin match x.type_spec with
+        let var = Ain.Variable.make ~index x.name (jaf_to_ain_type x.type_.spec) in
+        begin match x.type_.spec with
         | { data=(Int|Bool|Float|FuncType(_,_)); qualifier=Some Ref } ->
             let void = Ain.Variable.make ~index:(index + 1) "<void>" (Ain.Type.make Void) in
             convert_params xs (void::var::result) (index + 2)
@@ -810,7 +824,7 @@ let jaf_to_ain_function j_f (a_f:Ain.Function.t) =
   { a_f with
     vars;
     nr_args = List.length vars;
-    return_type = jaf_to_ain_type j_f.return;
+    return_type = jaf_to_ain_type j_f.return.spec;
     def_loc = match j_f.body with
       | Some _ -> Some j_f.loc
       | None -> a_f.def_loc
@@ -845,13 +859,13 @@ let jaf_to_ain_functype j_f (a_f:Ain.FunctionType.t) =
   { a_f with
     variables;
     nr_arguments = List.length variables;
-    return_type = jaf_to_ain_type j_f.return
+    return_type = jaf_to_ain_type j_f.return.spec;
   }
 
 let jaf_to_ain_hll_function j_f =
   let jaf_to_ain_hll_argument (param:variable) =
-    Ain.Library.Argument.create param.name (jaf_to_ain_type param.type_spec)
+    Ain.Library.Argument.create param.name (jaf_to_ain_type param.type_.spec)
   in
-  let return_type = jaf_to_ain_type j_f.return in
+  let return_type = jaf_to_ain_type j_f.return.spec in
   let arguments = List.map j_f.params ~f:jaf_to_ain_hll_argument in
   Ain.Library.Function.create j_f.name return_type arguments
