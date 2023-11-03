@@ -1250,7 +1250,8 @@ let function_of_syscall sys =
       is_lambda   = false;
       crc         = 0l;
       struct_type = None;
-      enum_type   = None
+      enum_type   = None;
+      def_loc     = None;
     }
   in
   let make_function i return_type name arg_types =
@@ -1404,7 +1405,8 @@ let function_of_builtin builtin t_param =
       is_lambda   = false;
       crc         = 0l;
       struct_type = None;
-      enum_type   = None
+      enum_type   = None;
+      def_loc     = None;
     }
   in
   let make_function return_type name (arg_types:Ain.Type.t list) =

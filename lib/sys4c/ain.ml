@@ -424,7 +424,8 @@ module Function = struct
     is_lambda : bool;
     crc : int32;
     struct_type : int option;
-    enum_type : int option
+    enum_type : int option;
+    def_loc : jaf_location option;
   }
 
   let create ?(index=(-1)) name =
@@ -438,7 +439,8 @@ module Function = struct
       is_lambda = false;
       crc = 0l;
       struct_type = None;
-      enum_type = None
+      enum_type = None;
+      def_loc = None;
     }
 
   let set_undefined f =
@@ -813,7 +815,8 @@ let read_functions buf count =
         is_lambda;
         crc;
         struct_type = None;
-        enum_type = None
+        enum_type = None;
+        def_loc = None;
       } in
       read_functions' (count - 1) (f::result) (index + 1)
     end else
@@ -1712,7 +1715,8 @@ let function_of_hll_function_index ain lib_no fun_no : Function.t =
     is_lambda = false;
     crc = 0l;
     struct_type = None;
-    enum_type = None
+    enum_type = None;
+    def_loc = None;
   }
 
 (* function types *)
@@ -1752,7 +1756,8 @@ let function_of_functype (ft:FunctionType.t) no : Function.t =
     is_lambda = false;
     crc = 0l;
     struct_type = None;
-    enum_type = None
+    enum_type = None;
+    def_loc = None;
   }
 
 let function_of_functype_index ain no =

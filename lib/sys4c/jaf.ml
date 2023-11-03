@@ -810,7 +810,10 @@ let jaf_to_ain_function j_f (a_f:Ain.Function.t) =
   { a_f with
     vars;
     nr_args = List.length vars;
-    return_type = jaf_to_ain_type j_f.return
+    return_type = jaf_to_ain_type j_f.return;
+    def_loc = match j_f.body with
+      | Some _ -> Some j_f.loc
+      | None -> a_f.def_loc
   }
 
 let jaf_to_ain_struct j_s (a_s:Ain.Struct.t) =

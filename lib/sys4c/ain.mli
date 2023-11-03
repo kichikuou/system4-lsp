@@ -76,6 +76,7 @@ module Function : sig
     crc : int32;
     struct_type : int option;
     enum_type : int option;
+    def_loc : jaf_location option;
   }
   val create : ?index:int -> string -> t
   val set_undefined : t -> t
