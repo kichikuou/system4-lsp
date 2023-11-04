@@ -43,6 +43,9 @@ class type_declare_visitor ctx = object (self)
               | None -> Ain.add_global ctx.ain g.name)
         end
     | Function (f) ->
+        Option.iter f.struct_name ~f:(fun s_name ->
+          f.name <- s_name ^ "@" ^ f.name;
+          f.class_index <- Ain.get_struct_index ctx.ain s_name);
         self#declare_function f
     | FuncTypeDef (f) ->
         if Option.is_none (Ain.get_functype ctx.ain f.name) then
@@ -142,19 +145,13 @@ class type_resolve_visitor ctx decl_only = object (self)
     super#visit_local_variable decl
 
   method! visit_declaration decl =
-    let function_class (f:fundecl) =
-      match f.struct_name with
-      | Some name -> Ain.get_struct_index ctx.ain name
-      | _ -> None
-    in
     let resolve_function f =
       self#resolve_typespec f.return.spec (ASTDeclaration(Function f));
       List.iter f.params ~f:(fun v -> self#resolve_typespec v.type_.spec (ASTVariable v))
     in
     begin match decl with
     | Function (f) ->
-        resolve_function f;
-        f.class_index <- function_class f
+        resolve_function f
     | FuncTypeDef (f) | DelegateDef (f) ->
         resolve_function f
     | Global (g) ->

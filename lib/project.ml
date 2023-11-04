@@ -91,6 +91,9 @@ let get_definition proj uri pos =
           return (Ain.get_global_by_index proj.ain i).location
       | Jaf.ASTExpression { node = Ident (_, Some (FunctionName i)); _ } :: _ ->
           return (location_of_func proj i)
+      | Jaf.ASTExpression { node = Member (_, _, Some (ClassMethod (_, i))); _ }
+        :: _ ->
+          return (location_of_func proj i)
       | Jaf.ASTType { spec; _ } :: _ -> (
           match base_type spec.data with
           | Struct (_, i) ->
