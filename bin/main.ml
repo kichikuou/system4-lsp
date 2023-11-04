@@ -2,6 +2,7 @@ open Base
 open Lwt.Syntax
 open Sys4c
 open System4_lsp
+open Project
 
 let show_error notify_back message =
   let params =
@@ -30,25 +31,14 @@ let () =
 class lsp_server ain_path =
   object (self)
     inherit Linol_lwt.Jsonrpc2.server as super
-    val mutable ain : Ain.t = Ain.create 4 0
-
-    val buffers : (string, Document.t) Hashtbl.t =
-      Hashtbl.create (module String)
-
+    val mutable project = Project.create (Ain.create 4 0)
     method spawn_query_handler f = Linol_lwt.spawn f
 
     method private _on_doc ~(notify_back : Linol_lwt.Jsonrpc2.notify_back)
         (uri : Lsp.Types.DocumentUri.t) (contents : string) =
       try
-        let doc =
-          Document.create ain
-            ~fname:(Lsp.Types.DocumentUri.to_path uri)
-            contents
-        in
-        Hashtbl.set buffers ~key:(Lsp.Types.DocumentUri.to_string uri) ~data:doc;
-        notify_back#send_diagnostic
-          (List.map doc.errors ~f:(fun (range, message) ->
-               Lsp.Types.Diagnostic.create ~range ~message ()))
+        let diagnostics = set_document project uri contents in
+        notify_back#send_diagnostic diagnostics
       with e -> show_exn notify_back e
 
     (* Do not use incremental update, to work around a bug in lsp 1.14 where its
@@ -63,7 +53,8 @@ class lsp_server ain_path =
       let* () =
         if not (String.is_empty ain_path) then
           try
-            ain <- Ain.load ain_path;
+            let ain = Ain.load ain_path in
+            project <- Project.create ain;
             notify_back#send_log_msg ~type_:Lsp.Types.MessageType.Info
               (ain_path ^ " loaded")
           with e -> show_exn notify_back e
@@ -78,26 +69,17 @@ class lsp_server ain_path =
         ~new_content =
       self#_on_doc ~notify_back d.uri new_content
 
-    method on_notif_doc_did_close ~notify_back:_ d =
-      Hashtbl.remove buffers (Lsp.Types.DocumentUri.to_string d.uri);
-      Lwt.return ()
-
+    method on_notif_doc_did_close ~notify_back:_ _ = Lwt.return ()
     method! config_hover = Some (`Bool true)
 
     method! on_req_hover ~notify_back:_ ~id:_ ~uri ~pos ~workDoneToken:_ _ =
-      (match Hashtbl.find buffers (Lsp.Types.DocumentUri.to_string uri) with
-      | Some doc -> RequestHandlers.get_hover doc pos
-      | None -> None)
-      |> Lwt.return
+      get_hover project uri pos |> Lwt.return
 
     method! config_definition = Some (`Bool true)
 
     method! on_req_definition ~notify_back:_ ~id:_ ~uri ~pos ~workDoneToken:_
         ~partialResultToken:_ _ =
-      (match Hashtbl.find buffers (Lsp.Types.DocumentUri.to_string uri) with
-      | Some doc -> RequestHandlers.get_definition doc pos
-      | None -> None)
-      |> Lwt.return
+      get_definition project uri pos |> Lwt.return
   end
 
 let run ain =

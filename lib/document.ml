@@ -16,11 +16,14 @@ let count_utf16_code_units_of_utf8_bytes bytes start end_ =
   in
   loop start 0
 
-let to_lsp_position (text : bytes) p =
-  Lsp.Types.Position.create ~line:(p.Lexing.pos_lnum - 1)
-    ~character:
-      (count_utf16_code_units_of_utf8_bytes text p.Lexing.pos_bol
-         p.Lexing.pos_cnum)
+let to_lsp_position (text : bytes) (p : Lexing.position) =
+  try
+    Lsp.Types.Position.create ~line:(p.pos_lnum - 1)
+      ~character:
+        (count_utf16_code_units_of_utf8_bytes text p.pos_bol p.pos_cnum)
+  with _ ->
+    Printf.failwithf "to_lsp_position failed: %s %d %d %d" p.pos_fname
+      p.pos_lnum p.pos_bol p.pos_cnum ()
 
 let to_lsp_range text (start, end_) =
   Lsp.Types.Range.create
