@@ -2,9 +2,14 @@ open Base
 open Sys4c
 open Document
 
-type t = { mutable ain : Ain.t; documents : (string, Document.t) Hashtbl.t }
+type t = {
+  ain : Ain.t;
+  srcdir : string;
+  documents : (string, Document.t) Hashtbl.t;
+}
 
-let create ain = { ain; documents = Hashtbl.create (module String) }
+let create ain srcdir =
+  { ain; srcdir; documents = Hashtbl.create (module String) }
 
 let set_document proj uri contents =
   let doc =
@@ -13,6 +18,11 @@ let set_document proj uri contents =
   Hashtbl.set proj.documents ~key:(Lsp.Types.DocumentUri.to_path uri) ~data:doc;
   List.map doc.errors ~f:(fun (range, message) ->
       Lsp.Types.Diagnostic.create ~range ~message ())
+
+let load_document proj fname =
+  let path = Stdlib.Filename.concat proj.srcdir fname in
+  let contents = Stdio.In_channel.read_all path |> UtfSjis.sjis2utf in
+  set_document proj (Lsp.Types.DocumentUri.of_path path) contents |> ignore
 
 let rec base_type = function
   | Jaf.Array { data; _ } | Jaf.Wrap { data; _ } -> base_type data

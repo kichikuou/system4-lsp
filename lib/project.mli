@@ -1,10 +1,15 @@
+open Base
+open Sys4c
+
 type t = {
-  mutable ain : Sys4c.Ain.t;
-  documents : (string, Document.t) Base.Hashtbl.t;
+  ain : Ain.t;
+  srcdir : string;
+  documents : (string, Document.t) Hashtbl.t;
 }
 
-val create : Sys4c.Ain.t -> t
+val create : Ain.t -> string -> t
 val set_document : t -> Lsp.Uri.t -> string -> Lsp.Types.Diagnostic.t list
+val load_document : t -> string -> unit
 
 (* LSP request handlers *)
 

@@ -28,10 +28,10 @@ let () =
     | Sys_error msg -> Some msg
     | _ -> None)
 
-class lsp_server ain_path =
+class lsp_server ain_path srcdir =
   object (self)
     inherit Linol_lwt.Jsonrpc2.server as super
-    val mutable project = Project.create (Ain.create 4 0)
+    val mutable project = Project.create (Ain.create 4 0) srcdir
     method spawn_query_handler f = Linol_lwt.spawn f
 
     method private _on_doc ~(notify_back : Linol_lwt.Jsonrpc2.notify_back)
@@ -54,7 +54,14 @@ class lsp_server ain_path =
         if not (String.is_empty ain_path) then
           try
             let ain = Ain.load ain_path in
-            project <- Project.create ain;
+            project <- Project.create ain srcdir;
+            (* AinDecompiler generates type definitions in classes.jaf and
+               global variables in globals.jaf. Loading these helps with Goto
+               Definition and type checking for functypes. *)
+            (try
+               load_document project "classes.jaf";
+               load_document project "globals.jaf"
+             with _ -> ());
             notify_back#send_log_msg ~type_:Lsp.Types.MessageType.Info
               (ain_path ^ " loaded")
           with e -> show_exn notify_back e
@@ -82,8 +89,8 @@ class lsp_server ain_path =
       get_definition project uri pos |> Lwt.return
   end
 
-let run ain =
-  let s = new lsp_server ain in
+let run ain srcdir =
+  let s = new lsp_server ain srcdir in
   let server = Linol_lwt.Jsonrpc2.create_stdio s in
   let task = Linol_lwt.Jsonrpc2.run server in
   Linol_lwt.run task
@@ -97,10 +104,14 @@ let print_version () =
 
 let () =
   let ain = ref "" in
+  let srcdir = ref (Stdlib.Sys.getcwd ()) in
   let usage_msg = "Usage: system4-lsp --ain <file>" in
   let speclist =
     [
       ("--ain", Stdlib.Arg.Set_string ain, ".ain file to load");
+      ( "--srcdir",
+        Stdlib.Arg.Set_string srcdir,
+        "Root directory of source files" );
       ( "--version",
         Stdlib.Arg.Unit print_version,
         "Display version information and exit" );
@@ -112,4 +123,4 @@ let () =
     Stdlib.exit 2
   in
   Stdlib.Arg.parse speclist anon_fun usage_msg;
-  run !ain
+  run !ain !srcdir
