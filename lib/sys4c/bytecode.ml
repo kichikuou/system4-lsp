@@ -843,7 +843,7 @@ let opcode_of_int = function
   | 0x10E -> X_A_INIT
   | 0x10F -> X_A_SIZE
   | 0x110 -> X_TO_STR
-  | _     -> failwith "invalid opcode"
+  | op    -> Printf.failwithf "invalid opcode %x" op ()
 
 let string_of_opcode = function
   | PUSH           -> "PUSH"
@@ -1589,7 +1589,7 @@ let args_of_opcode = function
   | C_REF ->          []
   | C_ASSIGN ->       []
   | MSG ->            [Message]
-  | CALLHLL ->        [Library; LibraryFunction; Int]
+  | CALLHLL ->        [Library; LibraryFunction] (* FIXME: Changed in ain >8 *)
   | PUSHSTRUCTPAGE -> []
   | CALLMETHOD ->     [Function]
   | SH_GLOBALREF ->   [Global]
@@ -1617,7 +1617,7 @@ let args_of_opcode = function
   | S_GTE ->          []
   | S_LENGTH2 ->      []
   | S_LENGTHBYTE2 ->  []
-  | NEW ->            [Struct; Int]
+  | NEW ->            [] (* FIXME: Changed in ain >8 *)
   | DELETE ->         []
   | CHECKUDO ->       []
   | A_REF ->          []
@@ -1647,9 +1647,9 @@ let args_of_opcode = function
   | S_PUSHBACK ->     []
   | S_POPBACK ->      []
   | FTOS ->           []
-  | S_MOD ->          [Int]
+  | S_MOD ->          [] (* FIXME: Changed in ain >8 *)
   | S_PLUSA2 ->       []
-  | OBJSWAP ->        [Int]
+  | OBJSWAP ->        [] (* FIXME: Changed in ain >8 *)
   | S_ERASE ->        []
   | SR_REF2 ->        [Struct]
   | S_ERASE2 ->       []
@@ -1756,7 +1756,7 @@ let args_of_opcode = function
   | DG_MINUSA ->          []
   | DG_CALLBEGIN ->       [Delegate]
   | DG_NEW ->             []
-  | DG_STR_TO_METHOD ->   [Delegate]
+  | DG_STR_TO_METHOD ->   [] (* FIXME: Changed in ain >8 *)
   | OP_0X102 -> []
   | X_GETENV -> []
   | X_SET ->    []
