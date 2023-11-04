@@ -41,18 +41,30 @@ let get_hover proj uri pos =
   match Hashtbl.find proj.documents (Lsp.Types.DocumentUri.to_path uri) with
   | None -> None
   | Some doc -> (
+      let make_hover location content =
+        Some
+          (Lsp.Types.Hover.create
+             ~contents:
+               (`MarkupContent
+                 (Lsp.Types.MarkupContent.create ~kind:PlainText ~value:content))
+             ~range:(to_lsp_range doc.text location)
+             ())
+      in
       match get_nodes_for_pos doc pos with
-      | [] -> None
       | Jaf.ASTExpression { valuetype = Some t; loc; _ } :: _ ->
-          let content = Ain.type_to_string_hum proj.ain t in
-          let range = to_lsp_range doc.text loc in
-          Some
-            (Lsp.Types.Hover.create
-               ~contents:
-                 (`MarkupContent
-                   (Lsp.Types.MarkupContent.create ~kind:PlainText
-                      ~value:content))
-               ~range ())
+          make_hover loc (Ain.type_to_string_hum proj.ain t)
+      | Jaf.ASTType { spec; location } :: _ -> (
+          match base_type spec.data with
+          | Struct (_, i) ->
+              let s = Ain.get_struct_by_index proj.ain i in
+              make_hover location ("class " ^ s.name)
+          | FuncType (_, i) ->
+              let ft = Ain.get_functype_by_index proj.ain i in
+              make_hover location ("functype " ^ ft.name)
+          | Delegate (_, i) ->
+              let dg = Ain.get_delegate_by_index proj.ain i in
+              make_hover location ("delegate " ^ dg.name)
+          | _ -> None)
       | _ -> None)
 
 let filename_of_func ain (func : Ain.Function.t) =
