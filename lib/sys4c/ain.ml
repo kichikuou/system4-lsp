@@ -1842,6 +1842,9 @@ let add_message ain str =
   ain.messages <- Array.append ain.messages [| str |];
   index
 
+let get_filename ain no =
+  ain.filenames.(no)
+
 let add_file ain name =
   let index = Array.length ain.filenames in
   ain.filenames <- Array.append ain.filenames [| name |];

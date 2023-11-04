@@ -46,6 +46,31 @@ let get_hover proj uri pos =
                ~range ())
       | _ -> None)
 
+let filename_of_func ain (func : Ain.Function.t) =
+  let code = Ain.get_code ain in
+  let rec find_eof addr =
+    match Bytecode.opcode_of_int (Stdlib.Bytes.get_int16_le code addr) with
+    | EOF ->
+        let i = Stdlib.Bytes.get_int32_le code (addr + 2) in
+        Ain.get_filename ain (Int32.to_int_exn i)
+    | op ->
+        let nr_args = List.length (Bytecode.args_of_opcode op) in
+        find_eof (addr + 2 + (nr_args * 4))
+  in
+  find_eof func.address
+
+let backslash_to_slash = String.map ~f:(function '\\' -> '/' | c -> c)
+
+let location_of_func proj i =
+  let func = Ain.get_function_by_index proj.ain i in
+  match func.def_loc with
+  | Some loc -> Some loc
+  | None ->
+      (* Load .jaf file and try again. *)
+      let fname = filename_of_func proj.ain func in
+      load_document proj (backslash_to_slash fname);
+      (Ain.get_function_by_index proj.ain i).def_loc
+
 let get_definition proj uri pos =
   match Hashtbl.find proj.documents (Lsp.Types.DocumentUri.to_path uri) with
   | None -> None
@@ -65,7 +90,7 @@ let get_definition proj uri pos =
         ->
           return (Ain.get_global_by_index proj.ain i).location
       | Jaf.ASTExpression { node = Ident (_, Some (FunctionName i)); _ } :: _ ->
-          return (Ain.get_function_by_index proj.ain i).def_loc
+          return (location_of_func proj i)
       | Jaf.ASTType { spec; _ } :: _ -> (
           match base_type spec.data with
           | Struct (_, i) ->

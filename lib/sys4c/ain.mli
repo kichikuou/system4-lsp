@@ -213,6 +213,7 @@ val get_string_no : t -> string -> int option
 val get_message : t -> int -> string option
 val add_message : t -> string -> int
 
+val get_filename : t -> int -> string
 val add_file : t -> string -> int
 
 val get_code : t -> bytes
