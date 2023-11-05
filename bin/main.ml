@@ -1,7 +1,7 @@
 open Base
 open Lwt.Syntax
-open Sys4c
 open System4_lsp
+open Types
 open Project
 
 let show_error notify_back message =
@@ -28,16 +28,16 @@ let () =
     | Sys_error msg -> Some msg
     | _ -> None)
 
-class lsp_server ain_path srcdir =
+class lsp_server =
   object (self)
     inherit Linol_lwt.Jsonrpc2.server as super
-    val mutable project = Project.create (Ain.create 4 0) srcdir
+    val project = Project.create ()
     method spawn_query_handler f = Linol_lwt.spawn f
 
     method private _on_doc ~(notify_back : Linol_lwt.Jsonrpc2.notify_back)
         (uri : Lsp.Types.DocumentUri.t) (contents : string) =
       try
-        let diagnostics = set_document project uri contents in
+        let diagnostics = update_document project uri contents in
         notify_back#send_diagnostic diagnostics
       with e -> show_exn notify_back e
 
@@ -51,21 +51,22 @@ class lsp_server ain_path srcdir =
 
     method! on_req_initialize ~notify_back i =
       let* () =
-        if not (String.is_empty ain_path) then
-          try
-            let ain = Ain.load ain_path in
-            project <- Project.create ain srcdir;
-            (* AinDecompiler generates type definitions in classes.jaf and
-               global variables in globals.jaf. Loading these helps with Goto
-               Definition and type checking for functypes. *)
-            (try
-               load_document project "classes.jaf";
-               load_document project "globals.jaf"
-             with _ -> ());
-            notify_back#send_log_msg ~type_:Lsp.Types.MessageType.Info
-              (ain_path ^ " loaded")
-          with e -> show_exn notify_back e
-        else Lwt.return ()
+        let options =
+          InitializationOptions.t_of_yojson
+            (Option.value i.initializationOptions ~default:(`Assoc []))
+        in
+        try
+          Project.initialize project options;
+          (* AinDecompiler generates type definitions in classes.jaf and global
+             variables in globals.jaf. Loading these helps with Goto Definition
+             and type checking for functypes. *)
+          (try
+             load_document project "classes.jaf";
+             load_document project "globals.jaf"
+           with _ -> ());
+          notify_back#send_log_msg ~type_:Lsp.Types.MessageType.Info
+            (options.ainPath ^ " loaded")
+        with e -> show_exn notify_back e
       in
       super#on_req_initialize ~notify_back i
 
@@ -89,8 +90,8 @@ class lsp_server ain_path srcdir =
       get_definition project uri pos |> Lwt.return
   end
 
-let run ain srcdir =
-  let s = new lsp_server ain srcdir in
+let run () =
+  let s = new lsp_server in
   let server = Linol_lwt.Jsonrpc2.create_stdio s in
   let task = Linol_lwt.Jsonrpc2.run server in
   Linol_lwt.run task
@@ -99,28 +100,10 @@ let print_version () =
   Stdio.printf "system4-lsp %s\n"
     (match Build_info.V1.version () with
     | None -> "n/a"
-    | Some v -> Build_info.V1.Version.to_string v);
-  Stdlib.exit 0
+    | Some v -> Build_info.V1.Version.to_string v)
 
 let () =
-  let ain = ref "" in
-  let srcdir = ref (Stdlib.Sys.getcwd ()) in
-  let usage_msg = "Usage: system4-lsp --ain <file>" in
-  let speclist =
-    [
-      ("--ain", Stdlib.Arg.Set_string ain, ".ain file to load");
-      ( "--srcdir",
-        Stdlib.Arg.Set_string srcdir,
-        "Root directory of source files" );
-      ( "--version",
-        Stdlib.Arg.Unit print_version,
-        "Display version information and exit" );
-    ]
-  in
-  let anon_fun s =
-    Stdlib.Arg.usage speclist
-      (Printf.sprintf "extra argument \"%s\"\n%s" s usage_msg);
-    Stdlib.exit 2
-  in
-  Stdlib.Arg.parse speclist anon_fun usage_msg;
-  run !ain !srcdir
+  let argv = Sys.get_argv () in
+  if Array.length argv = 2 && String.equal argv.(1) "--version" then
+    print_version ()
+  else run ()

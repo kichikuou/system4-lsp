@@ -1,14 +1,10 @@
 open Base
-open Sys4c
 
-type t = {
-  ain : Ain.t;
-  srcdir : string;
-  documents : (string, Document.t) Hashtbl.t;
-}
+type t
 
-val create : Ain.t -> string -> t
-val set_document : t -> Lsp.Uri.t -> string -> Lsp.Types.Diagnostic.t list
+val create : unit -> t
+val initialize : t -> Types.InitializationOptions.t -> unit
+val update_document : t -> Lsp.Uri.t -> string -> Lsp.Types.Diagnostic.t list
 val load_document : t -> string -> unit
 
 (* LSP request handlers *)

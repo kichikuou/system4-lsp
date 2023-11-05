@@ -1,3 +1,5 @@
 (library
  (name system4_lsp)
- (libraries sys4c base str lsp))
+ (libraries sys4c base str lsp ppx_yojson_conv_lib)
+ (lint
+  (pps ppx_yojson_conv)))

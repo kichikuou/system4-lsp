@@ -29,6 +29,7 @@
   dune
   dune-build-info
   menhir
+  ppx_yojson_conv_lib
   (ppx_expect :with-test)
   ;; linol dependencies
   (lsp (and (>= 1.14) (< 1.15)))

@@ -17,6 +17,7 @@ depends: [
   "dune" {>= "3.0"}
   "dune-build-info"
   "menhir"
+  "ppx_yojson_conv_lib"
   "ppx_expect" {with-test}
   "lsp" {>= "1.14" & < "1.15"}
   "lwt"

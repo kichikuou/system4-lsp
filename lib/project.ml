@@ -3,15 +3,24 @@ open Sys4c
 open Document
 
 type t = {
-  ain : Ain.t;
-  srcdir : string;
+  mutable ain : Ain.t;
+  mutable srcdir : string;
   documents : (string, Document.t) Hashtbl.t;
 }
 
-let create ain srcdir =
-  { ain; srcdir; documents = Hashtbl.create (module String) }
+let create () =
+  {
+    ain = Ain.create 4 0;
+    srcdir = "";
+    documents = Hashtbl.create (module String);
+  }
 
-let set_document proj uri contents =
+let initialize proj (options : Types.InitializationOptions.t) =
+  proj.srcdir <- options.srcDir;
+  if not (String.is_empty options.ainPath) then
+    proj.ain <- Ain.load options.ainPath
+
+let update_document proj uri contents =
   let doc =
     Document.create proj.ain ~fname:(Lsp.Types.DocumentUri.to_path uri) contents
   in
@@ -22,7 +31,7 @@ let set_document proj uri contents =
 let load_document proj fname =
   let path = Stdlib.Filename.concat proj.srcdir fname in
   let contents = Stdio.In_channel.read_all path |> UtfSjis.sjis2utf in
-  set_document proj (Lsp.Types.DocumentUri.of_path path) contents |> ignore
+  update_document proj (Lsp.Types.DocumentUri.of_path path) contents |> ignore
 
 let rec base_type = function
   | Jaf.Array { data; _ } | Jaf.Wrap { data; _ } -> base_type data
