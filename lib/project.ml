@@ -51,6 +51,27 @@ let get_hover proj uri pos =
              ())
       in
       match get_nodes_for_pos doc pos with
+      | Jaf.ASTExpression
+          { node = Member (_, _, Some (SystemFunction sys)); loc; _ }
+        :: _ ->
+          let f = Bytecode.function_of_syscall sys in
+          make_hover loc (Ain.function_to_string_hum proj.ain f)
+      | Jaf.ASTExpression
+          { node = Member (_, _, Some (HLLFunction (lib_no, fun_no))); loc; _ }
+        :: _ ->
+          let f = Ain.function_of_hll_function_index proj.ain lib_no fun_no in
+          make_hover loc (Ain.function_to_string_hum proj.ain f)
+      | Jaf.ASTExpression
+          { node = Member (obj, _, Some (BuiltinMethod builtin)); loc; _ }
+        :: _ ->
+          let elem_t =
+            Option.(
+              obj.valuetype >>= function
+              | { data = Array t; _ } -> Some t
+              | _ -> None)
+          in
+          let f = Bytecode.function_of_builtin builtin elem_t in
+          make_hover loc (Ain.function_to_string_hum proj.ain f)
       | Jaf.ASTExpression { valuetype = Some t; loc; _ } :: _ ->
           make_hover loc (Ain.type_to_string_hum proj.ain t)
       | Jaf.ASTType { spec; location } :: _ -> (
