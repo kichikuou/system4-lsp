@@ -128,6 +128,9 @@ let get_definition proj uri pos =
                 Some (`Location [ Lsp.Types.Location.create ~uri ~range ]))
       in
       match get_nodes_for_pos doc pos with
+      | Jaf.ASTExpression { node = Ident (_, Some (LocalVariable loc)); _ } :: _
+        ->
+          return (Some loc)
       | Jaf.ASTExpression { node = Ident (_, Some (GlobalVariable i)); _ } :: _
         ->
           return (Ain.get_global_by_index proj.ain i).location

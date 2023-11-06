@@ -274,7 +274,7 @@ class type_analyze_visitor ctx = object (self)
     | Ident (name, _) ->
         begin match environment#resolve name with
         | ResolvedLocal v ->
-            expr.node <- Ident (name, Some (LocalVariable (-1)));
+            expr.node <- Ident (name, Some (LocalVariable v.location));
             set_valuetype { data=v.type_.spec.data; qualifier=None }
         | ResolvedConstant v ->
             expr.node <- Ident (name, Some GlobalConstant);

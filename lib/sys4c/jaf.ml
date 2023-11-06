@@ -95,7 +95,7 @@ and data_type =
   | IMainSystem
 
 type ident_type =
-  | LocalVariable of int
+  | LocalVariable of (Lexing.position * Lexing.position)
   | GlobalVariable of int
   | GlobalConstant
   | FunctionName of int
