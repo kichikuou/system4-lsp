@@ -51,7 +51,7 @@ module Variable : sig
     initval : initval option;
     location : jaf_location option;
   }
-  val make : ?index:int -> string -> Type.t -> t
+  val make : ?index:int -> ?location:jaf_location -> string -> Type.t -> t
   val equal : t -> t -> bool
 end
 

@@ -808,7 +808,7 @@ let jaf_to_ain_variables j_p =
     match params with
     | [] -> List.rev result
     | x::xs ->
-        let var = Ain.Variable.make ~index x.name (jaf_to_ain_type x.type_.spec) in
+        let var = Ain.Variable.make ~index ~location:x.location x.name (jaf_to_ain_type x.type_.spec) in
         begin match x.type_.spec with
         | { data=(Int|Bool|Float|FuncType(_,_)); qualifier=Some Ref } ->
             let void = Ain.Variable.make ~index:(index + 1) "<void>" (Ain.Type.make Void) in

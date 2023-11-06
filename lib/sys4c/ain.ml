@@ -389,8 +389,8 @@ module Variable = struct
     location : jaf_location option;
   }
 
-  let make ?(index=(-1)) name value_type =
-    { index; name; name2=Some ""; value_type; initval=None; location=None }
+  let make ?(index=(-1)) ?location name value_type =
+    { index; name; name2=Some ""; value_type; initval=None; location }
 
   let equal a b =
     (String.equal a.name b.name)

@@ -136,6 +136,12 @@ let get_definition proj uri pos =
       | Jaf.ASTExpression { node = Member (_, _, Some (ClassMethod (_, i))); _ }
         :: _ ->
           return (location_of_func proj i)
+      | Jaf.ASTExpression
+          { node = Member (_, _, Some (ClassVariable (sno, mno))); _ }
+        :: _ ->
+          let s = Ain.get_struct_by_index proj.ain sno in
+          let v = List.nth_exn s.members mno in
+          return v.location
       | Jaf.ASTType { spec; _ } :: _ -> (
           match base_type spec.data with
           | Struct (_, i) ->
