@@ -140,9 +140,9 @@ class type_resolve_visitor ctx decl_only = object (self)
     end;
     super#visit_expression expr
 
-  method! visit_local_variable decl =
+  method! visit_variable decl =
     self#resolve_typespec decl.type_.spec (ASTVariable decl);
-    super#visit_local_variable decl
+    super#visit_variable decl
 
   method! visit_declaration decl =
     let resolve_function f =
@@ -154,13 +154,12 @@ class type_resolve_visitor ctx decl_only = object (self)
         resolve_function f
     | FuncTypeDef (f) | DelegateDef (f) ->
         resolve_function f
-    | Global (g) ->
-        self#resolve_typespec g.type_.spec (ASTDeclaration decl)
+    | Global (_) -> ()
     | StructDef (s) ->
         let resolve_structdecl = function
-          | AccessSpecifier _ -> ()
-          | MemberDecl (d) ->
-              self#resolve_typespec d.type_.spec (ASTDeclaration decl)
+          | AccessSpecifier _
+          | MemberDecl (_) ->
+              ()
           | Constructor (f)
           | Destructor (f)
           | Method (f) ->

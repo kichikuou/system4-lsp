@@ -425,7 +425,9 @@ class ivisitor ctx = object (self)
   method visit_statement (s : statement) =
     match s.node with
     | EmptyStatement -> ()
-    | Declarations (ds) -> List.iter ds ~f:self#visit_local_variable
+    | Declarations (ds) -> List.iter ds ~f:(fun v ->
+        self#visit_variable v;
+        environment#push_var v)
     | Expression (e) ->
         self#visit_expression e
     | Compound (items) ->
@@ -475,11 +477,10 @@ class ivisitor ctx = object (self)
       self#visit_expression a;
       self#visit_expression b
 
-  method visit_local_variable v =
+  method visit_variable v =
     self#visit_type_specifier v.type_;
     List.iter v.array_dim ~f:self#visit_expression;
     Option.iter v.initval ~f:self#visit_expression;
-    environment#push_var v
 
   method visit_fundecl f =
     self#visit_type_specifier f.return;
@@ -489,13 +490,8 @@ class ivisitor ctx = object (self)
     environment#leave_function
 
   method visit_declaration d =
-    let visit_vardecl d =
-      self#visit_type_specifier d.type_;
-      List.iter d.array_dim ~f:self#visit_expression;
-      Option.iter d.initval ~f:self#visit_expression
-    in
     match d with
-    | Global (g) -> visit_vardecl g
+    | Global (g) -> self#visit_variable g
     | Function (f) ->
         self#visit_fundecl f;
     | FuncTypeDef (_) -> ()
@@ -507,14 +503,9 @@ class ivisitor ctx = object (self)
         List.iter enum.values ~f:visit_enumval
 
   method visit_struct_declaration d =
-    let visit_vardecl d =
-      self#visit_type_specifier d.type_;
-      List.iter d.array_dim ~f:self#visit_expression;
-      Option.iter d.initval ~f:self#visit_expression
-    in
     match d with
     | AccessSpecifier (_) -> ()
-    | MemberDecl (d) -> visit_vardecl d
+    | MemberDecl (d) -> self#visit_variable d
     | Constructor (f) -> self#visit_fundecl f
     | Destructor (f) -> self#visit_fundecl f
     | Method (f) -> self#visit_fundecl f

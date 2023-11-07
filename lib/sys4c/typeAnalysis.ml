@@ -628,7 +628,8 @@ class type_analyze_visitor ctx = object (self)
           type_check (ASTStatement stmt) (Option.value_exn lhs.valuetype).data rhs
       end)
 
-  method visit_variable var =
+  method! visit_variable var =
+    super#visit_variable var;
     let rec calculate_array_rank (t:type_specifier) =
       match t.data with
       | Array sub_t -> 1 + (calculate_array_rank sub_t)
@@ -660,17 +661,8 @@ class type_analyze_visitor ctx = object (self)
     | None -> ()
     end
 
-  method! visit_local_variable var =
-    super#visit_local_variable var;
-    self#visit_variable var
-
   method! visit_declaration decl =
-    self#catch_errors (fun () ->
-      super#visit_declaration decl;
-      begin match decl with
-      | Global g -> self#visit_variable g
-      | _ -> ()
-      end)
+    self#catch_errors (fun () -> super#visit_declaration decl)
 
   method! visit_fundecl f =
     super#visit_fundecl f;

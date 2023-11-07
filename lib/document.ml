@@ -165,6 +165,12 @@ class ast_locator (doc : t) (pos : Lsp.Types.Position.t) =
         nodes <- node :: nodes;
         super#visit_struct_declaration decl)
 
+    method! visit_variable var =
+      let node = Jaf.ASTVariable var in
+      if range_contains doc.text (Jaf.ast_node_pos node) pos then (
+        nodes <- node :: nodes;
+        super#visit_variable var)
+
     method! visit_type_specifier t =
       let node = Jaf.ASTType t in
       if range_contains doc.text (Jaf.ast_node_pos node) pos then (
