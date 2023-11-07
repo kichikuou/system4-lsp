@@ -728,9 +728,11 @@ let params_to_string = function
       in
       sprintf "(%s)" (loop (var_to_string' p) ps)
 
-let block_to_string = function
+let body_to_string = function
   | None -> ";"
-  | Some block -> List.fold (List.map block ~f:stmt_to_string) ~init:"" ~f:(^)
+  | Some block ->
+    List.fold (List.map block ~f:stmt_to_string) ~init:"" ~f:(^)
+    |> sprintf " { %s }"
 
 let sdecl_to_string = function
   | AccessSpecifier (Public) -> "public:"
@@ -738,18 +740,21 @@ let sdecl_to_string = function
   | MemberDecl (d) ->
       var_to_string d
   | Constructor (d) ->
+      let struct_name, _ = String.lsplit2_exn d.name ~on:'@' in
       let params = params_to_string d.params in
-      let body = block_to_string d.body in
-      sprintf "%s%s { %s }" d.name params body
+      let body = body_to_string d.body in
+      sprintf "%s%s%s" struct_name params body
   | Destructor (d) ->
+      let struct_name, _ = String.lsplit2_exn d.name ~on:'@' in
       let params = params_to_string d.params in
-      let body = block_to_string d.body in
-      sprintf "~%s%s { %s }" d.name params body
+      let body = body_to_string d.body in
+      sprintf "~%s%s%s" struct_name params body
   | Method (d) ->
+      let _, name = String.lsplit2_exn d.name ~on:'@' in
       let return = type_spec_to_string d.return.spec in
       let params = params_to_string d.params in
-      let body = block_to_string d.body in
-      sprintf "%s %s%s { %s }" return d.name params body
+      let body = body_to_string d.body in
+      sprintf "%s %s%s%s" return name params body
 
 let decl_to_string d =
   match d with
@@ -758,8 +763,8 @@ let decl_to_string d =
   | Function (d) ->
       let return = type_spec_to_string d.return.spec in
       let params = params_to_string d.params in
-      let body = block_to_string d.body in
-      sprintf "%s %s%s { %s }" return d.name params body
+      let body = body_to_string d.body in
+      sprintf "%s %s%s%s" return d.name params body
   | FuncTypeDef (d) ->
       let return = type_spec_to_string d.return.spec in
       let params = params_to_string d.params in

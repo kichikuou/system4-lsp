@@ -86,6 +86,8 @@ let get_hover proj uri pos =
               let dg = Ain.get_delegate_by_index proj.ain i in
               make_hover location ("delegate " ^ dg.name)
           | _ -> None)
+      | (Jaf.ASTStructDecl sdecl as decl) :: _ ->
+          make_hover (Jaf.ast_node_pos decl) (Jaf.sdecl_to_string sdecl)
       | _ -> None)
 
 let filename_of_func ain (func : Ain.Function.t) =
