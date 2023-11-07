@@ -79,22 +79,20 @@ type t = {
 external reraise : exn -> 'a = "%reraise"
 
 let make_error ain lexbuf exn =
-  let make (lexbuf : Lexing.lexbuf) node_opt message =
-    let range =
-      match node_opt with
-      | Some node -> Jaf.ast_node_pos node |> to_lsp_range lexbuf.lex_buffer
-      | None ->
-          to_lsp_range lexbuf.lex_buffer (lexbuf.lex_start_p, lexbuf.lex_curr_p)
-    in
+  let make (lexbuf : Lexing.lexbuf) loc message =
+    let range = to_lsp_range lexbuf.lex_buffer loc in
     (range, message)
   in
   match exn with
-  | Lexer.Error | Parser.Error -> make lexbuf None "Syntax error."
-  | CompileError.CompileError (msg, node) -> make lexbuf (Some node) msg
+  | Lexer.Error | Parser.Error ->
+      make lexbuf (lexbuf.lex_start_p, lexbuf.lex_curr_p) "Syntax error."
+  | CompileError.SyntaxError (msg, loc) -> make lexbuf loc msg
+  | CompileError.CompileError (msg, node) ->
+      make lexbuf (Jaf.ast_node_pos node) msg
   | CompileError.Undefined_variable (name, node) ->
-      make lexbuf (Some node) ("Undefined variable: " ^ name)
+      make lexbuf (Jaf.ast_node_pos node) ("Undefined variable: " ^ name)
   | CompileError.Not_lvalue_error (_e, node) ->
-      make lexbuf (Some node) "Lvalue expected."
+      make lexbuf (Jaf.ast_node_pos node) "Lvalue expected."
   | CompileError.Type_error (expected, actual_opt, node) ->
       let actual =
         match actual_opt with
@@ -104,12 +102,12 @@ let make_error ain lexbuf exn =
             | None -> "")
         | None -> ""
       in
-      make lexbuf (Some node)
+      make lexbuf (Jaf.ast_node_pos node)
         ("Type error.\n Expected type: "
         ^ Ain.type_to_string_hum ain expected
         ^ actual)
   | CompileError.Arity_error (func, args, node) ->
-      make lexbuf (Some node)
+      make lexbuf (Jaf.ast_node_pos node)
         (Printf.sprintf
            "Arity error. '%s' expects %d arguments, but %d provided." func.name
            func.nr_args (List.length args))

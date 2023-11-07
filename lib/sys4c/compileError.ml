@@ -17,12 +17,16 @@
 open Base
 open Jaf
 
+exception SyntaxError of string * (Lexing.position * Lexing.position)
 exception Type_error of Ain.Type.t * expression option * ast_node
 exception Undefined_variable of string * ast_node
 exception Arity_error of Ain.Function.t * expression list * ast_node
 exception Not_lvalue_error of expression * ast_node
 exception CompileError of string * ast_node
 exception CompilerBug of string * ast_node option
+
+let syntax_error str loc =
+  raise (SyntaxError (str, loc))
 
 let data_type_error data expr parent =
   raise (Type_error ({data=data; is_ref=false}, expr, parent))

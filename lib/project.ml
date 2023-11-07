@@ -154,4 +154,6 @@ let get_definition proj uri pos =
           | Delegate (_, i) ->
               return (Ain.get_delegate_by_index proj.ain i).location
           | _ -> None)
+      | Jaf.ASTStructDecl (Method d | Constructor d | Destructor d) :: _ ->
+          return Option.(d.index >>= location_of_func proj)
       | _ -> None)

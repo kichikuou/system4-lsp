@@ -17,6 +17,7 @@
 %{
 
 open Jaf
+open CompileError
 
 let qtype qualifier data =
   { data=data; qualifier=qualifier }
@@ -52,12 +53,18 @@ let func loc type_ name params body =
   { name; loc; struct_name=None; return=type_; params=plist; body; is_label=false; index=None; class_index=None; super_index=None }
 
 let member_func loc type_opt struct_name is_dtor name params body =
-  let name = if is_dtor then "~" ^ name else name in
-  let type_ = match type_opt with
-    | Some type_ -> type_
-    | None -> implicit_void (fst loc)
+  let fundecl = match type_opt with
+  | Some type_ ->
+      if is_dtor then
+        syntax_error "Destructor cannot have return type." loc
+      else
+        func loc type_ name params body
+  | None ->
+    if not (String.equal struct_name name) then
+      syntax_error ((if is_dtor then "Destructor" else "Constructor") ^ " name doesn't match struct name.") loc
+    else
+      func loc (implicit_void (fst loc)) (if is_dtor then "1" else "0") params body
   in
-  let fundecl = func loc type_ name params body in
   { fundecl with struct_name=Some struct_name }
 
 let rec multidim_array dims t =
