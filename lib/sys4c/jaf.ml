@@ -226,6 +226,7 @@ type ast_node =
   | ASTStatement of statement
   | ASTVariable of variable
   | ASTDeclaration of declaration
+  | ASTStructDecl of struct_declaration
   | ASTType of ast_type
 
 let ast_node_pos = function
@@ -240,6 +241,14 @@ let ast_node_pos = function
       | DelegateDef f -> f.loc
       | StructDef s -> s.loc
       | Enum e -> e.loc
+      end
+  | ASTStructDecl d ->
+      begin match d with
+      | AccessSpecifier _ -> (Lexing.dummy_pos, Lexing.dummy_pos)
+      | MemberDecl v -> v.location
+      | Constructor f -> f.loc
+      | Destructor f -> f.loc
+      | Method f -> f.loc
       end
   | ASTType t -> t.location
 
@@ -492,17 +501,23 @@ class ivisitor ctx = object (self)
     | FuncTypeDef (_) -> ()
     | DelegateDef (_) -> ()
     | StructDef (s) ->
-        let visit_structdecl = function
-          | AccessSpecifier (_) -> ()
-          | MemberDecl (d) -> visit_vardecl d
-          | Constructor (f) -> self#visit_fundecl f
-          | Destructor (f) -> self#visit_fundecl f
-          | Method (f) -> self#visit_fundecl f
-        in
-        List.iter s.decls ~f:visit_structdecl
+        List.iter s.decls ~f:self#visit_struct_declaration
     | Enum (enum) ->
         let visit_enumval (_, expr) = Option.iter expr ~f:self#visit_expression in
         List.iter enum.values ~f:visit_enumval
+
+  method visit_struct_declaration d =
+    let visit_vardecl d =
+      self#visit_type_specifier d.type_;
+      List.iter d.array_dim ~f:self#visit_expression;
+      Option.iter d.initval ~f:self#visit_expression
+    in
+    match d with
+    | AccessSpecifier (_) -> ()
+    | MemberDecl (d) -> visit_vardecl d
+    | Constructor (f) -> self#visit_fundecl f
+    | Destructor (f) -> self#visit_fundecl f
+    | Method (f) -> self#visit_fundecl f
 
   method visit_type_specifier (_t : ast_type) =
     ()
@@ -704,20 +719,39 @@ and var_to_string' d =
 and var_to_string d =
   (var_to_string' d) ^ ";"
 
+let params_to_string = function
+  | [] -> "()"
+  | p::ps ->
+      let rec loop result = function
+        | [] -> result
+        | p::ps -> loop (sprintf "%s, %s" result (var_to_string' p)) ps
+      in
+      sprintf "(%s)" (loop (var_to_string' p) ps)
+
+let block_to_string = function
+  | None -> ";"
+  | Some block -> List.fold (List.map block ~f:stmt_to_string) ~init:"" ~f:(^)
+
+let sdecl_to_string = function
+  | AccessSpecifier (Public) -> "public:"
+  | AccessSpecifier (Private) -> "private:"
+  | MemberDecl (d) ->
+      var_to_string d
+  | Constructor (d) ->
+      let params = params_to_string d.params in
+      let body = block_to_string d.body in
+      sprintf "%s%s { %s }" d.name params body
+  | Destructor (d) ->
+      let params = params_to_string d.params in
+      let body = block_to_string d.body in
+      sprintf "~%s%s { %s }" d.name params body
+  | Method (d) ->
+      let return = type_spec_to_string d.return.spec in
+      let params = params_to_string d.params in
+      let body = block_to_string d.body in
+      sprintf "%s %s%s { %s }" return d.name params body
+
 let decl_to_string d =
-  let params_to_string = function
-    | [] -> "()"
-    | p::ps ->
-        let rec loop result = function
-          | [] -> result
-          | p::ps -> loop (sprintf "%s, %s" result (var_to_string' p)) ps
-        in
-        sprintf "(%s)" (loop (var_to_string' p) ps)
-  in
-  let block_to_string = function
-    | None -> ";"
-    | Some block -> List.fold (List.map block ~f:stmt_to_string) ~init:"" ~f:(^)
-  in
   match d with
   | Global (d) ->
       var_to_string d
@@ -735,25 +769,6 @@ let decl_to_string d =
       let params = params_to_string d.params in
       sprintf "delegate %s %s%s;" return d.name params
   | StructDef (d) ->
-      let sdecl_to_string = function
-        | AccessSpecifier (Public) -> "public:"
-        | AccessSpecifier (Private) -> "private:"
-        | MemberDecl (d) ->
-            var_to_string d
-        | Constructor (d) ->
-            let params = params_to_string d.params in
-            let body = block_to_string d.body in
-            sprintf "%s%s { %s }" d.name params body
-        | Destructor (d) ->
-            let params = params_to_string d.params in
-            let body = block_to_string d.body in
-            sprintf "~%s%s { %s }" d.name params body
-        | Method (d) ->
-            let return = type_spec_to_string d.return.spec in
-            let params = params_to_string d.params in
-            let body = block_to_string d.body in
-            sprintf "%s %s%s { %s }" return d.name params body
-      in
       let body = List.fold (List.map d.decls ~f:sdecl_to_string) ~init:"" ~f:(^) in
       sprintf "%s %s { %s };" (if d.is_class then "class" else "struct") d.name body
   | Enum (d) ->
@@ -775,6 +790,7 @@ let ast_to_string = function
   | ASTStatement (s) -> stmt_to_string s
   | ASTVariable (v) -> var_to_string v
   | ASTDeclaration (d) -> decl_to_string d
+  | ASTStructDecl (d) -> sdecl_to_string d
   | ASTType (t) -> type_spec_to_string t.spec
 
 let rec jaf_to_ain_data_type data =
