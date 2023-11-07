@@ -1,3 +1,5 @@
+open Sys4c
+
 type t = {
   ctx : Sys4c.Jaf.context;
   text : bytes;
@@ -7,6 +9,4 @@ type t = {
 
 val create : Sys4c.Ain.t -> fname:string -> string -> t
 val get_nodes_for_pos : t -> Lsp.Types.Position.t -> Sys4c.Jaf.ast_node list
-
-val to_lsp_range :
-  bytes -> Lexing.position * Lexing.position -> Lsp.Types.Range.t
+val to_lsp_range : bytes -> Jaf.location -> Lsp.Types.Range.t

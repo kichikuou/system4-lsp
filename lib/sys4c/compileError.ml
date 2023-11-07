@@ -17,7 +17,7 @@
 open Base
 open Jaf
 
-exception SyntaxError of string * (Lexing.position * Lexing.position)
+exception SyntaxError of string * location
 exception Type_error of Ain.Type.t * expression option * ast_node
 exception Undefined_variable of string * ast_node
 exception Arity_error of Ain.Function.t * expression list * ast_node

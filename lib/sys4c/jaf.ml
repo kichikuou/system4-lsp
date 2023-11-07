@@ -17,6 +17,8 @@
 open Base
 open Printf
 
+type location = Ain.jaf_location
+
 type unary_op =
   | UPlus
   | UMinus
@@ -69,7 +71,7 @@ type type_qualifier =
 
 type ast_type = {
   spec : type_specifier;
-  location : Lexing.position * Lexing.position;
+  location : location;
 }
 and type_specifier = {
   mutable data : data_type;
@@ -95,7 +97,7 @@ and data_type =
   | IMainSystem
 
 type ident_type =
-  | LocalVariable of (Lexing.position * Lexing.position)
+  | LocalVariable of location
   | GlobalVariable of int
   | GlobalConstant
   | FunctionName of int
@@ -122,7 +124,7 @@ type call_type =
 type expression = {
   mutable valuetype : Ain.Type.t option;
   mutable node : ast_expression;
-  loc: Lexing.position * Lexing.position;
+  loc: location;
 }
 and ast_expression =
   | ConstInt    of int
@@ -145,7 +147,7 @@ and ast_expression =
 
 type statement = {
   mutable node : ast_statement;
-  loc: Lexing.position * Lexing.position;
+  loc: location;
 }
 and ast_statement =
   | EmptyStatement
@@ -171,7 +173,7 @@ and ast_statement =
   | ObjSwap        of expression      * expression
 and variable = {
   name      : string;
-  location  : Lexing.position * Lexing.position;
+  location  : location;
   array_dim : expression list;
   type_     : ast_type;
   initval   : expression option;
@@ -180,7 +182,7 @@ and variable = {
 
 type fundecl = {
   mutable name : string;
-  loc: Lexing.position * Lexing.position;
+  loc: location;
   struct_name : string option;
   return : ast_type;
   params : variable list;
@@ -202,14 +204,14 @@ type struct_declaration =
 
 type structdecl = {
   name     : string;
-  loc      : Lexing.position * Lexing.position;
+  loc      : location;
   is_class : bool;
   decls    : struct_declaration list
 }
 
 type enumdecl = {
   name   : string option;
-  loc    : Lexing.position * Lexing.position;
+  loc    : location;
   values : (string * expression option) list
 }
 
