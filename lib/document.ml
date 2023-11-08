@@ -122,7 +122,7 @@ let create ain ~fname text =
   try
     let toplevel = Parser.jaf Lexer.token lexbuf in
     Declarations.register_type_declarations ctx toplevel;
-    Declarations.resolve_types ctx toplevel false;
+    Declarations.resolve_types ctx toplevel;
     Declarations.define_types ctx toplevel;
     let errors =
       TypeAnalysis.check_types ctx toplevel

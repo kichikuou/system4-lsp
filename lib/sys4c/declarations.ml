@@ -88,7 +88,7 @@ let register_type_declarations ctx decls =
 (*
  * AST pass to resolve user-defined types (struct/enum/function types).
  *)
-class type_resolve_visitor ctx decl_only = object (self)
+class type_resolve_visitor ctx = object (self)
   inherit ivisitor ctx as super
 
   method resolve_type name node =
@@ -123,14 +123,17 @@ class type_resolve_visitor ctx decl_only = object (self)
             end
         end
 
-  method resolve_typespec ts node =
-    match ts.data with
-    | Unresolved (t) ->
-        ts.data <- self#resolve_type t node
-    | Array (t)
-    | Wrap (t) ->
-        self#resolve_typespec t node
-    | _ -> ()
+  method! visit_type_specifier type_ =
+    let rec resolve_typespec ts =
+      match ts.data with
+      | Unresolved (t) ->
+          ts.data <- self#resolve_type t (ASTType type_)
+      | Array (t)
+      | Wrap (t) ->
+          resolve_typespec t
+      | _ -> ()
+    in
+    resolve_typespec type_.spec
 
   method! visit_expression expr =
     begin match expr.node with
@@ -139,42 +142,10 @@ class type_resolve_visitor ctx decl_only = object (self)
     | _ -> ()
     end;
     super#visit_expression expr
-
-  method! visit_variable decl =
-    self#resolve_typespec decl.type_.spec (ASTVariable decl);
-    super#visit_variable decl
-
-  method! visit_declaration decl =
-    let resolve_function f =
-      self#resolve_typespec f.return.spec (ASTDeclaration(Function f));
-      List.iter f.params ~f:(fun v -> self#resolve_typespec v.type_.spec (ASTVariable v))
-    in
-    begin match decl with
-    | Function (f) ->
-        resolve_function f
-    | FuncTypeDef (f) | DelegateDef (f) ->
-        resolve_function f
-    | Global (_) -> ()
-    | StructDef (s) ->
-        let resolve_structdecl = function
-          | AccessSpecifier _
-          | MemberDecl (_) ->
-              ()
-          | Constructor (f)
-          | Destructor (f)
-          | Method (f) ->
-              resolve_function f
-        in
-        List.iter s.decls ~f:resolve_structdecl
-    | Enum (_) ->
-        compile_error "enum types not yet supported" (ASTDeclaration decl)
-    end;
-    if not decl_only then
-      super#visit_declaration decl
 end
 
-let resolve_types ctx decls decl_only =
-  (new type_resolve_visitor ctx decl_only)#visit_toplevel decls
+let resolve_types ctx decls =
+  (new type_resolve_visitor ctx)#visit_toplevel decls
 
 (*
  * AST pass over top-level declarations to define function/struct types.
@@ -215,22 +186,3 @@ end
 
 let define_types ctx decls =
   (new type_define_visitor ctx)#visit_toplevel decls
-
-let define_library ctx decls name =
-  let is_struct_def decl =
-    match decl with
-    | StructDef (_) -> true
-    | _ -> false
-  in
-  let (struct_defs, fun_decls) = List.partition_tf decls ~f:is_struct_def in
-  (* handle struct definitions *)
-  register_type_declarations ctx struct_defs;
-  resolve_types ctx struct_defs true;
-  define_types ctx struct_defs;
-  (* define library *)
-  let functions = List.map fun_decls ~f:(function
-    | Function (f) -> jaf_to_ain_hll_function f
-    | decl -> compiler_bug "unexpected declaration in .hll file" (Some (ASTDeclaration decl))
-  ) in
-  let lib = { (Ain.add_library ctx.ain name) with functions } in
-  Ain.write_library ctx.ain lib

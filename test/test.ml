@@ -49,7 +49,7 @@ let%expect_test "undefined type error" =
   analyze {|
     undef_t c;
   |};
-  [%expect {| (1, 12) - (1, 13) Undefined type: undef_t |}]
+  [%expect {| (1, 4) - (1, 11) Undefined type: undef_t |}]
 
 let%expect_test "type error" =
   analyze {|

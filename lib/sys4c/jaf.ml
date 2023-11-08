@@ -497,17 +497,18 @@ class ivisitor ctx = object (self)
   method visit_fundecl f =
     self#visit_type_specifier f.return;
     List.iter f.params ~f:self#visit_variable;
-    environment#enter_function f;
-    Option.iter f.body ~f:(List.iter ~f:self#visit_statement);
-    environment#leave_function
+    Option.iter f.body ~f:(fun body ->
+      environment#enter_function f;
+      List.iter ~f:self#visit_statement body;
+      environment#leave_function);
 
   method visit_declaration d =
     match d with
     | Global (ds) -> self#visit_vardecls ~is_local:false ds
-    | Function (f) ->
-        self#visit_fundecl f;
-    | FuncTypeDef (_) -> ()
-    | DelegateDef (_) -> ()
+    | Function (f)
+    | FuncTypeDef (f)
+    | DelegateDef (f) ->
+      self#visit_fundecl f;
     | StructDef (s) ->
         List.iter s.decls ~f:self#visit_struct_declaration
     | Enum (enum) ->
