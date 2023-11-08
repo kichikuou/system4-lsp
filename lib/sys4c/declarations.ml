@@ -34,14 +34,14 @@ class type_declare_visitor ctx = object (self)
 
   method! visit_declaration decl =
     match decl with
-    | Global (g) ->
-        begin match g.type_.spec.qualifier with
-        | Some Const -> ()
-        | _ ->
-            g.index <- Some (match Ain.get_global ctx.ain g.name with
-              | Some g -> g.index
-              | None -> Ain.add_global ctx.ain g.name)
-        end
+    | Global (d) ->
+        List.iter d.vars ~f:(fun g ->
+          match g.type_.spec.qualifier with
+          | Some Const -> ()
+          | _ ->
+              g.index <- Some (match Ain.get_global ctx.ain g.name with
+                | Some g -> g.index
+                | None -> Ain.add_global ctx.ain g.name))
     | Function (f) ->
         Option.iter f.struct_name ~f:(fun s_name ->
           f.name <- s_name ^ "@" ^ f.name;
@@ -184,13 +184,13 @@ class type_define_visitor ctx = object
 
   method! visit_declaration decl =
     match decl with
-    | Global (g) ->
-        begin match g.type_.spec.qualifier with
-        | Some Const ->
-            ctx.const_vars <- g::ctx.const_vars  (* FIXME: replace existing entry *)
-        | _ ->
-            Ain.set_global_type_loc ctx.ain g.name (jaf_to_ain_type g.type_.spec) g.location
-        end
+    | Global (d) ->
+        List.iter d.vars ~f:(fun g ->
+          match g.type_.spec.qualifier with
+          | Some Const ->
+              ctx.const_vars <- g::ctx.const_vars  (* FIXME: replace existing entry *)
+          | _ ->
+              Ain.set_global_type_loc ctx.ain g.name (jaf_to_ain_type g.type_.spec) g.location)
     | Function (f) ->
         let obj = Ain.get_function_by_index ctx.ain (Option.value_exn f.index) in
         obj |> jaf_to_ain_function f |> Ain.write_function ctx.ain

@@ -393,7 +393,7 @@ objswap_statement
 
 declaration
   : declaration_specifiers separated_nonempty_list(COMMA, init_declarator) SEMICOLON
-    { decls $1 $2 }
+    { { decl_loc=$sloc; type_spec=$1; vars=decls $1 $2 } }
   ;
 
 declaration_specifiers
@@ -419,7 +419,7 @@ array_allocation
 
 external_declaration
   : declaration
-    { List.map (fun d -> Global (d)) $1 }
+    { [Global $1] }
   | declaration_specifiers IDENTIFIER parameter_list block
     { [Function (func $sloc $1 $2 $3 (Some $4))] }
   | ioption(declaration_specifiers) IDENTIFIER COCO boption(BITNOT) IDENTIFIER parameter_list block
@@ -431,13 +431,13 @@ external_declaration
   | DELEGATE declaration_specifiers IDENTIFIER functype_parameter_list SEMICOLON
     { [DelegateDef (func $sloc $2 $3 $4 None)] }
   | struct_or_class IDENTIFIER LBRACE struct_declaration+ RBRACE SEMICOLON
-    { [StructDef ({ loc=$sloc; is_class=$1; name=$2; decls=(List.concat $4) })] }
+    { [StructDef ({ loc=$sloc; is_class=$1; name=$2; decls=$4 })] }
   | ENUM enumerator_list SEMICOLON
     { [Enum ({ loc=$sloc; name=None; values=$2 })] }
   | ENUM IDENTIFIER enumerator_list SEMICOLON
     { [Enum ({ loc=$sloc; name=Some $2; values=$3 })] }
   | GLOBALGROUP IDENTIFIER LBRACE declaration+ RBRACE
-    { List.concat $4 |> List.map (fun d -> Global (d)) }
+    { List.map (fun d -> Global (d)) $4 }
   ;
 
 struct_or_class
@@ -449,7 +449,7 @@ hll_declaration
   : declaration_specifiers IDENTIFIER parameter_list SEMICOLON
     { [Function (func $sloc $1 $2 $3 None)] }
   | struct_or_class IDENTIFIER LBRACE struct_declaration+ RBRACE SEMICOLON
-    { [StructDef ({ loc=$sloc; is_class=$1; name=$2; decls=(List.concat $4) })] }
+    { [StructDef ({ loc=$sloc; is_class=$1; name=$2; decls=$4 })] }
   ;
 
 enumerator_list
@@ -481,15 +481,15 @@ functype_parameter_list
 
 struct_declaration
   : access_specifier COLON
-    { [AccessSpecifier $1] }
+    { AccessSpecifier $1 }
   | declaration_specifiers separated_nonempty_list(COMMA, declarator) SEMICOLON
-    { decls $1 $2 |> List.map (fun d -> MemberDecl (d)) }
+    { MemberDecl { decl_loc=$sloc; type_spec=$1; vars=decls $1 $2 } }
   | declaration_specifiers IDENTIFIER parameter_list opt_body
-    { [Method (func $sloc $1 $2 $3 $4)] }
+    { Method (func $sloc $1 $2 $3 $4) }
   | IDENTIFIER LPAREN VOID? RPAREN opt_body
-    { [Constructor (func $sloc (implicit_void $symbolstartpos) $1 [] $5)] }
+    { Constructor (func $sloc (implicit_void $symbolstartpos) $1 [] $5) }
   | BITNOT IDENTIFIER LPAREN RPAREN opt_body
-    { [Destructor (func $sloc (implicit_void $symbolstartpos) $2 [] $5)] }
+    { Destructor (func $sloc (implicit_void $symbolstartpos) $2 [] $5) }
   ;
 
 opt_body
