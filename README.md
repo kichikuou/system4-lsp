@@ -7,7 +7,7 @@ System 4 programming language.
 
 - [x] Diagnostics
 - [x] Hover
-- [ ] Jump to Definition
+- [x] Jump to Definition
 - [ ] Find References
 - [ ] Code Completion
 - [ ] Signature Help
