@@ -579,7 +579,7 @@ class type_analyze_visitor ctx = object (self)
       | Declarations (_) -> ()
       | Expression (_) -> ()
       | Compound (_) -> ()
-      | Labeled (_, _) -> ()
+      | Label (_) -> ()
       | If (test, _, _) | While (test, _) | DoWhile (test, _) ->
           type_check (ASTStatement (stmt)) Int test
       | For (_, Some test, _, _) ->
@@ -594,10 +594,10 @@ class type_analyze_visitor ctx = object (self)
       | Switch (expr, _) ->
           (* TODO: string switch *)
           type_check (ASTStatement (stmt)) Int expr
-      | Case (expr, _) ->
+      | Case (expr) ->
           (* TODO: string switch *)
           type_check (ASTStatement (stmt)) Int expr
-      | Default (_) -> ()
+      | Default -> ()
       | Return (Some e) ->
           begin match environment#current_function with
           | None -> compiler_bug "return statement outside of function" (Some(ASTStatement stmt))

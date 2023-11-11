@@ -287,3 +287,19 @@ let%expect_test "RefEqual operator" =
        Expected type: ref null
        Actual type: bool
       (29, 8) - (29, 17) Undefined variable: undefined |}]
+
+let%expect_test "label_is_a_statement" =
+  analyze
+    {|
+      void f() {
+        switch (1) {
+          case 1:
+          default:
+        }
+        if (1)
+          label1:
+        else
+          label2:
+      }
+    |};
+  [%expect {| ok |}]

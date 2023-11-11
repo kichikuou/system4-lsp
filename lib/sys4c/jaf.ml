@@ -154,7 +154,7 @@ and ast_statement =
   | Declarations   of vardecls
   | Expression     of expression
   | Compound       of statement list
-  | Labeled        of string          * statement
+  | Label          of string
   | If             of expression      * statement * statement
   | While          of expression      * statement
   | DoWhile        of expression      * statement
@@ -165,8 +165,8 @@ and ast_statement =
   | Continue
   | Break
   | Switch         of expression      * statement list
-  | Case           of expression      * statement
-  | Default        of statement
+  | Case           of expression
+  | Default
   | Return         of expression option
   | MessageCall    of string
   | RefAssign      of expression      * expression
@@ -446,8 +446,7 @@ class ivisitor ctx = object (self)
         environment#push;
         List.iter items ~f:self#visit_statement;
         environment#pop
-    | Labeled (_, a) ->
-        self#visit_statement a
+    | Label (_) -> ()
     | If (test, cons, alt) ->
         self#visit_expression test;
         self#visit_statement cons;
@@ -474,11 +473,9 @@ class ivisitor ctx = object (self)
     | Switch (e, stmts) ->
         self#visit_expression e;
         List.iter stmts ~f:self#visit_statement
-    | Case (e, stmt) ->
-        self#visit_expression e;
-        self#visit_statement stmt
-    | Default (stmt) ->
-        self#visit_statement stmt
+    | Case (e) ->
+        self#visit_expression e
+    | Default -> ()
     | Return (e) ->
         Option.iter e ~f:self#visit_expression
     | MessageCall _ -> ()
@@ -664,8 +661,8 @@ let rec stmt_to_string (stmt : statement) =
       items
       |> List.map ~f:stmt_to_string
       |> List.fold ~init:"" ~f:(^)
-  | Labeled (label, stmt) ->
-      sprintf "%s: %s" label (stmt_to_string stmt)
+  | Label (label) ->
+      sprintf "%s:" label
   | If (test, body, alt) ->
       let s_test = expr_to_string test in
       let s_body = stmt_to_string body in
@@ -696,10 +693,10 @@ let rec stmt_to_string (stmt : statement) =
       let s_expr = expr_to_string expr in
       let s_body = body |> List.map ~f:stmt_to_string |> List.fold ~init:"" ~f:(^) in
       sprintf "switch (%s) { %s }" s_expr s_body
-  | Case (expr, stmt) ->
-      sprintf "case %s: %s" (expr_to_string expr) (stmt_to_string stmt)
-  | Default (stmt) ->
-      sprintf "default: %s" (stmt_to_string stmt)
+  | Case (expr) ->
+      sprintf "case %s:" (expr_to_string expr)
+  | Default ->
+      sprintf "default:"
   | Return (None) ->
       "return;"
   | Return (Some e) ->
