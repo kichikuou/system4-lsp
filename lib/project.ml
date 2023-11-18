@@ -33,8 +33,16 @@ let load_document proj fname =
   let contents = Stdio.In_channel.read_all path |> UtfSjis.sjis2utf in
   update_document proj (Lsp.Types.DocumentUri.of_path path) contents |> ignore
 
-let rec base_type = function
-  | Jaf.Array { data; _ } | Jaf.Wrap { data; _ } -> base_type data
+let rec jaf_base_type = function
+  | Jaf.Array { data; _ } | Jaf.Wrap { data; _ } -> jaf_base_type data
+  | t -> t
+
+let rec ain_base_type = function
+  | Ain.Type.Array t
+  | Ain.Type.Wrap t
+  | Ain.Type.Option t
+  | Ain.Type.Unknown87 t ->
+      ain_base_type t.data
   | t -> t
 
 let get_hover proj uri pos =
@@ -75,7 +83,7 @@ let get_hover proj uri pos =
       | Jaf.ASTExpression { valuetype = Some t; loc; _ } :: _ ->
           make_hover loc (Ain.type_to_string_hum proj.ain t)
       | Jaf.ASTType { spec; location } :: _ -> (
-          match base_type spec.data with
+          match jaf_base_type spec.data with
           | Struct (_, i) ->
               let s = Ain.get_struct_by_index proj.ain i in
               make_hover location ("class " ^ s.name)
@@ -115,47 +123,55 @@ let location_of_func proj i =
       load_document proj (backslash_to_slash fname);
       (Ain.get_function_by_index proj.ain i).def_loc
 
-let get_definition proj uri pos =
+let find_location proj uri pos f =
   match Hashtbl.find proj.documents (Lsp.Types.DocumentUri.to_path uri) with
   | None -> None
   | Some doc -> (
-      let return =
-        Option.bind ~f:(fun loc ->
-            let fname = (fst loc).Lexing.pos_fname in
-            match Hashtbl.find proj.documents fname with
-            | None -> None
-            | Some doc ->
-                let range = to_lsp_range doc.text loc in
-                let uri = Lsp.Types.DocumentUri.of_path fname in
-                Some (`Location [ Lsp.Types.Location.create ~uri ~range ]))
-      in
-      match get_nodes_for_pos doc pos with
-      | Jaf.ASTExpression { node = Ident (_, Some (LocalVariable loc)); _ } :: _
-        ->
-          return (Some loc)
-      | Jaf.ASTExpression { node = Ident (_, Some (GlobalVariable i)); _ } :: _
-        ->
-          return (Ain.get_global_by_index proj.ain i).location
-      | Jaf.ASTExpression { node = Ident (_, Some (FunctionName i)); _ } :: _ ->
-          return (location_of_func proj i)
-      | Jaf.ASTExpression { node = Member (_, _, Some (ClassMethod (_, i))); _ }
-        :: _ ->
-          return (location_of_func proj i)
-      | Jaf.ASTExpression
-          { node = Member (_, _, Some (ClassVariable (sno, mno))); _ }
-        :: _ ->
-          let s = Ain.get_struct_by_index proj.ain sno in
-          let v = List.nth_exn s.members mno in
-          return v.location
-      | Jaf.ASTType { spec; _ } :: _ -> (
-          match base_type spec.data with
-          | Struct (_, i) ->
-              return (Ain.get_struct_by_index proj.ain i).location
-          | FuncType (_, i) ->
-              return (Ain.get_functype_by_index proj.ain i).location
-          | Delegate (_, i) ->
-              return (Ain.get_delegate_by_index proj.ain i).location
-          | _ -> None)
-      | Jaf.ASTStructDecl (Method d | Constructor d | Destructor d) :: _ ->
-          return Option.(d.index >>= location_of_func proj)
-      | _ -> None)
+      match f (get_nodes_for_pos doc pos) with
+      | Some loc -> (
+          let fname = (fst loc).Lexing.pos_fname in
+          match Hashtbl.find proj.documents fname with
+          | None -> None
+          | Some doc ->
+              let range = to_lsp_range doc.text loc in
+              let uri = Lsp.Types.DocumentUri.of_path fname in
+              Some (`Location [ Lsp.Types.Location.create ~uri ~range ]))
+      | None -> None)
+
+let get_definition proj uri pos =
+  find_location proj uri pos (function
+    | Jaf.ASTExpression { node = Ident (_, Some (LocalVariable loc)); _ } :: _
+      ->
+        Some loc
+    | Jaf.ASTExpression { node = Ident (_, Some (GlobalVariable i)); _ } :: _ ->
+        (Ain.get_global_by_index proj.ain i).location
+    | Jaf.ASTExpression { node = Ident (_, Some (FunctionName i)); _ } :: _ ->
+        location_of_func proj i
+    | Jaf.ASTExpression { node = Member (_, _, Some (ClassMethod (_, i))); _ }
+      :: _ ->
+        location_of_func proj i
+    | Jaf.ASTExpression
+        { node = Member (_, _, Some (ClassVariable (sno, mno))); _ }
+      :: _ ->
+        let s = Ain.get_struct_by_index proj.ain sno in
+        let v = List.nth_exn s.members mno in
+        v.location
+    | Jaf.ASTType { spec; _ } :: _ -> (
+        match jaf_base_type spec.data with
+        | Struct (_, i) -> (Ain.get_struct_by_index proj.ain i).location
+        | FuncType (_, i) -> (Ain.get_functype_by_index proj.ain i).location
+        | Delegate (_, i) -> (Ain.get_delegate_by_index proj.ain i).location
+        | _ -> None)
+    | Jaf.ASTStructDecl (Method d | Constructor d | Destructor d) :: _ ->
+        Option.(d.index >>= location_of_func proj)
+    | _ -> None)
+
+let get_type_definition proj uri pos =
+  find_location proj uri pos (function
+    | Jaf.ASTExpression { valuetype = Some t; _ } :: _ -> (
+        match ain_base_type t.data with
+        | Struct i -> (Ain.get_struct_by_index proj.ain i).location
+        | FuncType i -> (Ain.get_functype_by_index proj.ain i).location
+        | Delegate i -> (Ain.get_delegate_by_index proj.ain i).location
+        | _ -> None)
+    | _ -> None)

@@ -49,6 +49,20 @@ class lsp_server =
         change = Some Lsp.Types.TextDocumentSyncKind.Full;
       }
 
+    method! config_modify_capabilities c =
+      { c with typeDefinitionProvider = Some (`Bool true) }
+
+    method! on_request_unhandled : type r.
+        notify_back:Linol_lwt.Jsonrpc2.notify_back ->
+        id:Linol_lwt.Jsonrpc2.Req_id.t ->
+        r Lsp.Client_request.t ->
+        r Lwt.t =
+      fun ~notify_back ~id -> function
+        | Lsp.Client_request.TextDocumentTypeDefinition
+            { textDocument; position; _ } ->
+            get_type_definition project textDocument.uri position |> Lwt.return
+        | r -> super#on_request_unhandled ~notify_back ~id r
+
     method! on_req_initialize ~notify_back i =
       let* () =
         let options =

@@ -14,3 +14,6 @@ val get_hover :
 
 val get_definition :
   t -> Lsp.Uri.t -> Lsp.Types.Position.t -> Lsp.Types.Locations.t option
+
+val get_type_definition :
+  t -> Lsp.Uri.t -> Lsp.Types.Position.t -> Lsp.Types.Locations.t option
