@@ -28,10 +28,7 @@
   camlzip
   dune
   dune-build-info
+  (linol-lwt (>= 0.6))
   menhir
   ppx_yojson_conv_lib
-  (ppx_expect :with-test)
-  ;; linol dependencies
-  (lsp (and (>= 1.14) (< 1.15)))
-  lwt
-  logs))
+  (ppx_expect :with-test)))

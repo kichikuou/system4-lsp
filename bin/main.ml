@@ -106,7 +106,7 @@ class lsp_server =
 
 let run () =
   let s = new lsp_server in
-  let server = Linol_lwt.Jsonrpc2.create_stdio s in
+  let server = Linol_lwt.Jsonrpc2.create_stdio ~env:() s in
   let task = Linol_lwt.Jsonrpc2.run server in
   Linol_lwt.run task
 
