@@ -24,7 +24,7 @@ jobs:
         run: |
           git config --global core.autocrlf false
 
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         with:
           submodules: true
 
@@ -57,7 +57,7 @@ jobs:
           cp "${CYGWIN_ROOT}/usr/x86_64-w64-mingw32/sys-root/mingw/bin/zlib1.dll" dist/system4-lsp/
 
       - name: Upload the build artifact
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: system4-lsp-${{ matrix.os }}
           path: dist
