@@ -26,7 +26,7 @@ let update_document proj uri contents =
   in
   Hashtbl.set proj.documents ~key:(Lsp.Types.DocumentUri.to_path uri) ~data:doc;
   List.map doc.errors ~f:(fun (range, message) ->
-      Lsp.Types.Diagnostic.create ~range ~message ())
+      Lsp.Types.Diagnostic.create ~range ~message:(`String message) ())
 
 let load_document proj fname =
   let path = Stdlib.Filename.concat proj.srcdir fname in
