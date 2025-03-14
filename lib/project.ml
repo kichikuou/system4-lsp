@@ -2,9 +2,18 @@ open Base
 open Sys4c
 open Document
 
+type encoding = UTF8 | ShiftJIS
+
+let encoding_of_string s =
+  match String.lowercase s with
+  | "utf-8" -> UTF8
+  | "shift_jis" -> ShiftJIS
+  | _ -> raise (Invalid_argument ("Invalid encoding: " ^ s))
+
 type t = {
   mutable ain : Ain.t;
   mutable srcdir : string;
+  mutable srcEncoding : encoding;
   documents : (string, Document.t) Hashtbl.t;
 }
 
@@ -12,13 +21,16 @@ let create () =
   {
     ain = Ain.create 4 0;
     srcdir = "";
+    srcEncoding = ShiftJIS;
     documents = Hashtbl.create (module String);
   }
 
 let initialize proj (options : Types.InitializationOptions.t) =
   proj.srcdir <- options.srcDir;
   if not (String.is_empty options.ainPath) then
-    proj.ain <- Ain.load options.ainPath
+    proj.ain <- Ain.load options.ainPath;
+  if not (String.is_empty options.srcEncoding) then
+    proj.srcEncoding <- encoding_of_string options.srcEncoding
 
 let update_document proj uri contents =
   let doc =
@@ -30,7 +42,10 @@ let update_document proj uri contents =
 
 let load_document proj fname =
   let path = Stdlib.Filename.concat proj.srcdir fname in
-  let contents = Stdio.In_channel.read_all path |> UtfSjis.sjis2utf in
+  let to_utf8 =
+    match proj.srcEncoding with UTF8 -> Fn.id | ShiftJIS -> UtfSjis.sjis2utf
+  in
+  let contents = Stdio.In_channel.read_all path |> to_utf8 in
   update_document proj (Lsp.Types.DocumentUri.of_path path) contents |> ignore
 
 let rec jaf_base_type = function
