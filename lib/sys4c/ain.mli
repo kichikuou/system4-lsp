@@ -5,10 +5,8 @@ val minor_version : t -> int
 val version_gte : t -> int * int -> bool
 val version_lt : t -> int * int -> bool
 
-type jaf_location = Lexing.position * Lexing.position
-
 module Type : sig
-  type data =
+  type t =
     | Void
     | Int
     | Float
@@ -22,6 +20,7 @@ module Type : sig
     | HLLFunc2
     | HLLParam
     | Array of t
+    | Ref of t
     | Wrap of t
     | Option of t
     | Unknown87 of t
@@ -31,17 +30,13 @@ module Type : sig
     | HLLFunc
     | Unknown98
     | IFaceWrap of int
-    | Function of int
-    | Method of int
+    | Function
+    | Method
     | NullType
 
-  and t = { data : data; is_ref : bool }
-
-  val equal : t -> t -> bool
-  val data_to_string : data -> string
   val to_string : t -> string
   val int_of_data_type : int -> t -> int
-  val make : ?is_ref:bool -> data -> t
+  val is_ref : t -> bool
 end
 
 module Variable : sig
@@ -53,17 +48,13 @@ module Variable : sig
     name2 : string option;
     value_type : Type.t;
     initval : initval option;
-    location : jaf_location option;
   }
 
-  val make : ?index:int -> ?location:jaf_location -> string -> Type.t -> t
-  val equal : t -> t -> bool
+  val make : ?index:int -> string -> Type.t -> t
 end
 
 module Global : sig
   type t = { variable : Variable.t; group_index : int }
-
-  val equal : t -> t -> bool
 end
 
 module Function : sig
@@ -79,14 +70,12 @@ module Function : sig
     crc : int32;
     struct_type : int option;
     enum_type : int option;
-    def_loc : jaf_location option;
   }
 
   val create : ?index:int -> string -> t
   val set_undefined : t -> t
   val is_defined : t -> bool
   val logical_parameters : t -> Variable.t list
-  val equal : t -> t -> bool
 end
 
 module Struct : sig
@@ -100,10 +89,7 @@ module Struct : sig
     destructor : int;
     members : Variable.t list;
     vmethods : int list;
-    location : jaf_location option;
   }
-
-  val equal : t -> t -> bool
 end
 
 module Library : sig
@@ -111,7 +97,6 @@ module Library : sig
     type t = { name : string; value_type : Type.t }
 
     val create : string -> Type.t -> t
-    val equal : t -> t -> bool
   end
 
   module Function : sig
@@ -124,12 +109,9 @@ module Library : sig
     }
 
     val create : string -> Type.t -> Argument.t list -> t
-    val equal : t -> t -> bool
   end
 
   type t = { index : int; name : string; functions : Function.t list }
-
-  val equal : t -> t -> bool
 end
 
 module Switch : sig
@@ -150,32 +132,27 @@ module FunctionType : sig
     return_type : Type.t;
     nr_arguments : int;
     variables : Variable.t list;
-    location : jaf_location option;
   }
 
   val logical_parameters : t -> Variable.t list
-  val function_compatible : t -> Function.t -> bool
-  val equal : t -> t -> bool
 end
 
 val create : int -> int -> t
 val load : string -> t
 val write : ?raw:bool -> t -> Stdio.Out_channel.t -> unit
 val write_file : t -> string -> unit
-val type_to_string_hum : t -> Type.t -> string
-val function_to_string_hum : t -> Function.t -> string
-val variable_to_string_hum : t -> Variable.t -> string
 val get_global : t -> string -> Variable.t option
 val get_global_by_index : t -> int -> Variable.t
-val set_global_type_loc : t -> string -> Type.t -> jaf_location -> unit
+val set_global_type : t -> string -> Type.t -> unit
+val set_global_initval : t -> string -> Variable.initval -> unit
 val write_new_global : t -> Variable.t -> int
-val add_global : t -> string -> int
+val add_global : t -> string -> int -> int
+val add_global_group : t -> string -> int
 val get_function : t -> string -> Function.t option
 val get_function_by_index : t -> int -> Function.t
 val write_function : t -> Function.t -> unit
 val write_new_function : t -> Function.t -> int
 val add_function : t -> string -> Function.t
-val dup_function : t -> int -> int
 val get_struct : t -> string -> Struct.t option
 val get_struct_index : t -> string -> int option
 val get_struct_by_index : t -> int -> Struct.t
@@ -183,7 +160,7 @@ val write_struct : t -> Struct.t -> unit
 val write_new_struct : t -> Struct.t -> int
 val add_struct : t -> string -> Struct.t
 val write_switch : t -> Switch.t -> unit
-val add_switch : t -> Switch.t
+val add_switch : t -> Switch.case_type -> Switch.t
 val get_enum : t -> string -> int option
 val get_library_index : t -> string -> int option
 val get_library_function_index : t -> int -> string -> int option
@@ -210,7 +187,7 @@ val add_string : t -> string -> int
 val get_string_no : t -> string -> int option
 val get_message : t -> int -> string option
 val add_message : t -> string -> int
-val get_filename : t -> int -> string
+val get_file : t -> int -> string option
 val add_file : t -> string -> int
 val get_code : t -> bytes
 val append_bytecode : t -> CBuffer.t -> unit
@@ -224,15 +201,11 @@ val nr_functypes : t -> int
 val nr_delegates : t -> int
 val nr_libraries : t -> int
 val global_iter : ?from:int -> f:(Global.t -> unit) -> t -> unit
-val global_for_all : ?from:int -> f:(Global.t -> bool) -> t -> bool
 val function_iter : ?from:int -> f:(Function.t -> unit) -> t -> unit
-val function_for_all : ?from:int -> f:(Function.t -> bool) -> t -> bool
 val struct_iter : ?from:int -> f:(Struct.t -> unit) -> t -> unit
-val struct_for_all : ?from:int -> f:(Struct.t -> bool) -> t -> bool
 val functype_iter : ?from:int -> f:(FunctionType.t -> unit) -> t -> unit
-val functype_for_all : ?from:int -> f:(FunctionType.t -> bool) -> t -> bool
 val delegate_iter : ?from:int -> f:(FunctionType.t -> unit) -> t -> unit
-val delegate_for_all : ?from:int -> f:(FunctionType.t -> bool) -> t -> bool
+val library_iter : ?from:int -> f:(Library.t -> unit) -> t -> unit
 
 exception File_error
 exception Unrecognized_format

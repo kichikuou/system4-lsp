@@ -1,9 +1,26 @@
+(* Copyright (C) 2024 kichikuou <KichikuouChrome@gmail.com>
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program; if not, see <http://gnu.org/licenses/>.
+ *)
+
 open Base
 
 let is_sjis_byte1 c =
   Char.O.(('\x81' <= c && c <= '\x9f') || ('\xe0' <= c && c <= '\xfc'))
 
 let is_sjis_byte2 c = Char.O.('\x40' <= c && c <= '\xfc' && c <> '\x7f')
+let is_hankaku_kana c = Char.O.('\xa1' <= c && c <= '\xdf')
 
 let s2u =
   let s2u_80 = [|
@@ -1697,15 +1714,15 @@ let sjis_to_uchar c1 c2 =
     if u <> 0 then Some (Uchar.of_scalar_exn u) else None
   else None
 
-let sjis2utf sjis =
-  let buf = Buffer.create (String.length sjis) in
+let to_utf8 sjis =
+  let buf = Buffer.create (String.length sjis * 2) in
   let i = ref 0 in
   while !i < String.length sjis do
     let c1 = sjis.[!i] in
     Int.incr i;
     let utf =
       if Char.O.(c1 <= '\x7f') then Uchar.of_char c1
-      else if Char.O.(c1 >= '\xa1' && c1 <= '\xdf') then
+      else if is_hankaku_kana c1 then
         Uchar.of_scalar_exn (0xfec0 + Char.to_int c1)
       else
         let c2 = sjis.[!i] in
@@ -1720,7 +1737,7 @@ let sjis2utf sjis =
   done;
   Buffer.contents buf
 
-let is_sjis ch =
+let is_valid ch =
   (0x01 <= ch && ch <= 0x7e)
   (* ASCII *) || (0xa1 <= ch && ch <= 0xdf)
   (* half-width kana *)
@@ -1729,3 +1746,51 @@ let is_sjis ch =
      let c1 = Char.of_int_exn (ch land 0xff)
      and c2 = Char.of_int_exn (ch lsr 8) in
      Option.is_some (sjis_to_uchar c1 c2)
+
+let u2s = Array.create ~len:0x10000 0
+
+let () =
+  (* ASCII *)
+  for i = 0 to 0x7f do
+    u2s.(i) <- i
+  done;
+  (* half-width kana *)
+  for i = 0xa1 to 0xdf do
+    u2s.(0xfec0 + i) <- i
+  done;
+  (* 2-byte characters *)
+  for i = 0x80 to 0xff do
+    for j = 0x40 to 0xff do
+      let u = s2u.(i - 0x80).(j - 0x40) in
+      if u <> 0 then u2s.(u) <- i lor (j lsl 8)
+    done
+  done
+
+let from_uchar_le u =
+  if Uchar.to_scalar u < 0x10000 then
+    let c = u2s.(Uchar.to_scalar u) in
+    if c <> 0 then Some c else None
+  else None
+
+let from_utf8 s =
+  let buf = Buffer.create (String.length s) in
+  let i = ref 0 in
+  while !i < String.length s do
+    Stdlib.Uchar.(
+      let dec = Stdlib.String.get_utf_8_uchar s !i in
+      if not (utf_decode_is_valid dec) then
+        Printf.failwithf "invalid UTF-8 string: \"%s\"" s ();
+      (match from_uchar_le (utf_decode_uchar dec) with
+      | Some c ->
+          if c <= 0xff then Buffer.add_char buf (Char.of_int_exn c)
+          else (
+            Buffer.add_char buf (Char.of_int_exn (c land 0xff));
+            Buffer.add_char buf (Char.of_int_exn (c lsr 8)))
+      | None ->
+          Printf.failwithf
+            "Unicode character '%s' cannot be converted to Shift_JIS"
+            (String.sub s ~pos:!i ~len:(utf_decode_length dec))
+            ());
+      i := !i + utf_decode_length dec)
+  done;
+  Buffer.contents buf

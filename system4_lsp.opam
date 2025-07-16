@@ -13,6 +13,7 @@ depends: [
   "ocaml"
   "base"
   "stdio"
+  "vector"
   "camlzip"
   "dune" {>= "3.0"}
   "dune-build-info"

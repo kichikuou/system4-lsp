@@ -82,7 +82,6 @@ let () =
               "float",        FLOAT;
               "bool",         BOOL;
               "string",       STRING;
-              "hll_struct",   HLL_STRUCT;
               "hll_param",    HLL_PARAM;
               "hll_func",     HLL_FUNC;
               "hll_delegate", HLL_DELEGATE;
@@ -95,11 +94,12 @@ let () =
               "case",         CASE;
               "default",      DEFAULT;
               "goto",         GOTO;
-              "jump",         JUMP;
-              "jumps",        JUMPS;
               "continue",     CONTINUE;
               "break",        BREAK;
               "return",       RETURN;
+              "jump",         JUMP;
+              "jumps",        JUMPS;
+              "assert",       ASSERT;
               "NULL",         NULL;
               "this",         THIS;
               "new",          NEW;
@@ -114,8 +114,14 @@ let () =
               "private",      PRIVATE;
               "public",       PUBLIC;
               "enum",         ENUM;
+              "__FILE__",     FILE_MACRO;
+              "__LINE__",     LINE_MACRO;
+              "__DATE__",     DATE_MACRO;
+              "__TIME__",     TIME_MACRO;
               "globalgroup",  GLOBALGROUP;
-              "imain_system", IMAINSYSTEM ]
+              "unknown_functype", UNKNOWN_FUNCTYPE;
+              "unknown_delegate", UNKNOWN_DELEGATE;
+            ]
 }
 
 let u  = ['\x80'-'\xbf']
@@ -133,12 +139,13 @@ let d  = ['0'-'9']
 let h  = ['a'-'f' 'A'-'F' '0'-'9']
 let hp = '0' ['x' 'X']
 let l  = ['a'-'z' 'A'-'Z' '_'] | uch
-let a = ['a'-'z' 'A'-'Z' '_' '0'-'9'] | uch
+let a  = ['a'-'z' 'A'-'Z' '_' '0'-'9'] | uch
 let e  = ['E' 'e'] ['+' '-']? d+
 let p  = ['P' 'p'] ['+' '-']? d+
 let es = '\\' ( ['\'' '"' '?' '\\' 'a' 'b' 'f' 'n' 'r' 't' 'v'] | 'x' h+ )
 let ws = [' ' '\t']
 let sc = [^ '\\' '\n' '"'] | es
+let mc = [^ '\\' '\n' '\''] | es
 
 rule token = parse
     [' ' '\t' '\r']         { token lexbuf } (* skip blanks *)
@@ -155,7 +162,7 @@ rule token = parse
   | (hp h+ p) as n          { F_CONSTANT(Float.of_string n) }
   | (hp h* '.' h+ p) as n   { F_CONSTANT(Float.of_string n) }
   | (hp h+ '.' p) as n      { F_CONSTANT(Float.of_string n) }
-  | ("'" sc* "'") as s      { C_CONSTANT(process_message s) }
+  | ("'" mc* "'") as s      { C_CONSTANT(process_message s) }
   | ('"' sc* '"' ws*)+ as s { S_CONSTANT(process_string s) }
   | '+'                     { PLUS }
   | '-'                     { MINUS }
@@ -205,8 +212,8 @@ rule token = parse
   | ','                     { COMMA }
   | ':'                     { COLON }
   | "::"                    { COCO }
-  | '@'                     { AT }
   | ';'                     { SEMICOLON }
+  | '@'                     { AT }
   | '#'                     { HASH }
   | l as c                  { IDENTIFIER(c) }
   | (l a*) as s             {
@@ -221,4 +228,4 @@ and block_comment = parse
     "*/"      { token lexbuf }
   | [^ '\n']  { block_comment lexbuf }
   | ['\n']    { Lexing.new_line lexbuf; block_comment lexbuf }
-  | eof       { failwith "unterminated block comment" }
+  | eof       { raise Error }

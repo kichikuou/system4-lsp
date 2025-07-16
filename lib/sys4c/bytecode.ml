@@ -840,7 +840,7 @@ let opcode_of_int = function
   | 0x10E -> X_A_INIT
   | 0x10F -> X_A_SIZE
   | 0x110 -> X_TO_STR
-  | op -> Printf.failwithf "invalid opcode %x" op ()
+  | op -> Printf.failwithf "invalid opcode 0x%X" op ()
 
 let string_of_opcode = function
   | PUSH -> "PUSH"
@@ -1179,6 +1179,38 @@ let int_of_syscall = function
   | ExistFunc -> 0x1B
   | CopySaveFile -> 0x1C
 
+let syscall_of_int = function
+  | 0x00 -> Exit
+  | 0x01 -> GlobalSave
+  | 0x02 -> GlobalLoad
+  | 0x03 -> LockPeek
+  | 0x04 -> UnlockPeek
+  | 0x05 -> Reset
+  | 0x06 -> Output
+  | 0x07 -> MsgBox
+  | 0x08 -> ResumeSave
+  | 0x09 -> ResumeLoad
+  | 0x0A -> ExistFile
+  | 0x0B -> OpenWeb
+  | 0x0C -> GetSaveFolderName
+  | 0x0D -> GetTime
+  | 0x0E -> GetGameName
+  | 0x0F -> Error
+  | 0x10 -> ExistSaveFile
+  | 0x11 -> IsDebugMode
+  | 0x12 -> MsgBoxOkCancel
+  | 0x13 -> GetFuncStackName
+  | 0x14 -> Peek
+  | 0x15 -> Sleep
+  | 0x16 -> ResumeWriteComment
+  | 0x17 -> ResumeReadComment
+  | 0x18 -> GroupSave
+  | 0x19 -> GroupLoad
+  | 0x1A -> DeleteSaveFile
+  | 0x1B -> ExistFunc
+  | 0x1C -> CopySaveFile
+  | _ -> failwith "invalid syscall"
+
 let syscall_of_string = function
   | "Exit" -> Some Exit
   | "GlobalSave" -> Some GlobalSave
@@ -1211,97 +1243,36 @@ let syscall_of_string = function
   | "CopySaveFile" -> Some CopySaveFile
   | _ -> None
 
-let function_of_syscall sys =
-  let t_void = Ain.Type.make Void in
-  let t_int = Ain.Type.make Int in
-  let t_string = Ain.Type.make String in
-  let t_bool = Ain.Type.make Bool in
-  let t_ref_int = Ain.Type.make ~is_ref:true Int in
-  let t_ref_array_string = Ain.Type.make ~is_ref:true (Array t_string) in
-  let make_vars (types : Ain.Type.t list) =
-    let make_var t i =
-      let (r : Ain.Variable.t) =
-        {
-          index = i;
-          name = "";
-          name2 = Some "";
-          value_type = t;
-          initval = None;
-          location = None;
-        }
-      in
-      r
-    in
-    List.map2_exn types
-      (List.init (List.length types) ~f:Stdlib.( ~+ ))
-      ~f:make_var
-  in
-  let (default : Ain.Function.t) =
-    {
-      index = -1;
-      name = "";
-      address = 0;
-      nr_args = 0;
-      vars = [];
-      return_type = t_void;
-      is_label = false;
-      is_lambda = false;
-      crc = 0l;
-      struct_type = None;
-      enum_type = None;
-      def_loc = None;
-    }
-  in
-  let make_function i return_type name arg_types =
-    {
-      default with
-      index = i;
-      name;
-      nr_args = List.length arg_types;
-      vars = make_vars arg_types;
-      return_type;
-    }
-  in
-  match sys with
-  | Exit -> make_function 0x00 t_void "Exit" [ t_int ]
-  | GlobalSave -> make_function 0x01 t_int "GlobalSave" [ t_string; t_string ]
-  | GlobalLoad -> make_function 0x02 t_int "GlobalLoad" [ t_string; t_string ]
-  | LockPeek -> make_function 0x03 t_int "LockPeek" []
-  | UnlockPeek -> make_function 0x04 t_int "UnlockPeek" []
-  | Reset -> make_function 0x05 t_void "Reset" []
-  | Output -> make_function 0x06 t_string "Output" [ t_string ]
-  | MsgBox -> make_function 0x07 t_string "MsgBox" [ t_string ]
-  | ResumeSave ->
-      make_function 0x08 t_int "ResumeSave" [ t_string; t_string; t_ref_int ]
-  | ResumeLoad -> make_function 0x09 t_void "ResumeLoad" [ t_string; t_string ]
-  | ExistFile -> make_function 0x0A t_int "ExistFile" [ t_string ]
-  | OpenWeb -> make_function 0x0B t_void "OpenWeb" [ t_string ]
-  | GetSaveFolderName -> make_function 0x0C t_string "GetSaveFolderName" []
-  | GetTime -> make_function 0x0D t_int "GetTime" []
-  | GetGameName -> make_function 0x0E t_string "GetGameName" []
-  | Error -> make_function 0x0F t_string "Error" [ t_string ]
-  | ExistSaveFile -> make_function 0x10 t_int "ExistSaveFile" [ t_string ]
-  | IsDebugMode -> make_function 0x11 t_int "IsDebugMode" []
-  | MsgBoxOkCancel -> make_function 0x12 t_int "MsgBoxOkCancel" [ t_string ]
-  | GetFuncStackName -> make_function 0x13 t_string "GetFuncStackName" [ t_int ]
-  | Peek -> make_function 0x14 t_void "Peek" []
-  | Sleep -> make_function 0x15 t_void "Sleep" [ t_int ]
-  | ResumeWriteComment ->
-      make_function 0x16 t_bool "ResumeWriteComment"
-        [ t_string; t_string; t_ref_array_string ]
-  | ResumeReadComment ->
-      make_function 0x17 t_bool "ResumeReadComment"
-        [ t_string; t_string; t_ref_array_string ]
-  | GroupSave ->
-      make_function 0x18 t_int "GroupSave"
-        [ t_string; t_string; t_string; t_ref_int ]
-  | GroupLoad ->
-      make_function 0x19 t_int "GroupLoad"
-        [ t_string; t_string; t_string; t_ref_int ]
-  | DeleteSaveFile -> make_function 0x1A t_int "DeleteSaveFile" [ t_string ]
-  | ExistFunc -> make_function 0x1B t_bool "ExistFunc" [ t_string ]
-  | CopySaveFile ->
-      make_function 0x1C t_int "CopySaveFile" [ t_string; t_string ]
+let string_of_syscall = function
+  | Exit -> "Exit"
+  | GlobalSave -> "GlobalSave"
+  | GlobalLoad -> "GlobalLoad"
+  | LockPeek -> "LockPeek"
+  | UnlockPeek -> "UnlockPeek"
+  | Reset -> "Reset"
+  | Output -> "Output"
+  | MsgBox -> "MsgBox"
+  | ResumeSave -> "ResumeSave"
+  | ResumeLoad -> "ResumeLoad"
+  | ExistFile -> "ExistFile"
+  | OpenWeb -> "OpenWeb"
+  | GetSaveFolderName -> "GetSaveFolderName"
+  | GetTime -> "GetTime"
+  | GetGameName -> "GetGameName"
+  | Error -> "Error"
+  | ExistSaveFile -> "ExistSaveFile"
+  | IsDebugMode -> "IsDebugMode"
+  | MsgBoxOkCancel -> "MsgBoxOkCancel"
+  | GetFuncStackName -> "GetFuncStackName"
+  | Peek -> "Peek"
+  | Sleep -> "Sleep"
+  | ResumeWriteComment -> "ResumeWriteComment"
+  | ResumeReadComment -> "ResumeReadComment"
+  | GroupSave -> "GroupSave"
+  | GroupLoad -> "GroupLoad"
+  | DeleteSaveFile -> "DeleteSaveFile"
+  | ExistFunc -> "ExistFunc"
+  | CopySaveFile -> "CopySaveFile"
 
 type builtin =
   | Assert
@@ -1328,8 +1299,9 @@ type builtin =
   | ArrayErase
   | ArrayInsert
   | ArraySort
-  | ArrayFind
+  | ArraySortBy
   | ArrayReverse
+  | ArrayFind
   | DelegateSet
   | DelegateAdd
   | DelegateNumof
@@ -1369,8 +1341,9 @@ let array_builtin_of_string = function
   | "Erase" -> Some ArrayErase
   | "Insert" -> Some ArrayInsert
   | "Sort" -> Some ArraySort
-  | "Find" -> Some ArrayFind
+  | "SortBy" -> Some ArraySortBy
   | "Reverse" -> Some ArrayReverse
+  | "Find" -> Some ArrayFind
   | _ -> None
 
 let delegate_builtin_of_string = function
@@ -1381,104 +1354,6 @@ let delegate_builtin_of_string = function
   | "Erase" -> Some DelegateErase
   | "Clear" -> Some DelegateClear
   | _ -> None
-
-let builtin_of_string (t : Ain.Type.data) name =
-  match t with
-  | Int -> int_builtin_of_string name
-  | Float -> float_builtin_of_string name
-  | String -> string_builtin_of_string name
-  | Array _ -> array_builtin_of_string name
-  | Delegate _ -> delegate_builtin_of_string name
-  | _ -> None
-
-let function_of_builtin builtin t_param =
-  let t_void = Ain.Type.make Void in
-  let t_int = Ain.Type.make Int in
-  let t_string = Ain.Type.make String in
-  let t_ref_array t_elem = Ain.Type.make ~is_ref:true (Array t_elem) in
-  let t_func = Ain.Type.make ~is_ref:true (Function 0) in
-  let t_method = Ain.Type.make ~is_ref:true (Method 0) in
-  let (default : Ain.Function.t) =
-    {
-      index = -1;
-      name = "";
-      address = 0;
-      nr_args = 0;
-      vars = [];
-      return_type = t_void;
-      is_label = false;
-      is_lambda = false;
-      crc = 0l;
-      struct_type = None;
-      enum_type = None;
-      def_loc = None;
-    }
-  in
-  let make_function return_type name (arg_types : Ain.Type.t list) =
-    let make_var (t : Ain.Type.t) i =
-      let (r : Ain.Variable.t) =
-        {
-          index = i;
-          name = "";
-          name2 = Some "";
-          value_type = t;
-          initval = None;
-          location = None;
-        }
-      in
-      r
-    in
-    {
-      default with
-      name;
-      nr_args = List.length arg_types;
-      vars =
-        List.map2_exn arg_types
-          (List.init (List.length arg_types) ~f:Stdlib.( ~+ ))
-          ~f:make_var;
-      return_type;
-    }
-  in
-  match builtin with
-  | Assert -> make_function t_void "assert" [ t_int ]
-  | IntString -> make_function t_string "String" []
-  | FloatString -> make_function t_string "String" []
-  | StringInt -> make_function t_int "Int" []
-  | StringLength -> make_function t_int "Length" []
-  | StringLengthByte -> make_function t_int "LengthByte" []
-  | StringEmpty -> make_function t_int "Empty" []
-  | StringFind -> make_function t_int "Find" [ t_string ]
-  | StringGetPart -> make_function t_string "GetPart" [ t_int; t_int ]
-  | StringPushBack -> make_function t_void "PushBack" [ t_int ]
-  | StringPopBack -> make_function t_void "PopBack" []
-  | StringErase -> make_function t_void "Erase" [ t_int ]
-  | ArrayAlloc -> make_function t_void "Alloc" [ t_int ]
-  | ArrayRealloc -> make_function t_void "Realloc" [ t_int ]
-  | ArrayFree -> make_function t_void "Free" []
-  | ArrayNumof -> make_function t_int "Numof" [ t_int ]
-  | ArrayCopy ->
-      make_function t_int "Copy"
-        [ t_int; t_ref_array (Option.value_exn t_param); t_int; t_int ]
-  | ArrayFill ->
-      make_function t_int "Fill" [ t_int; t_int; Option.value_exn t_param ]
-  | ArrayPushBack ->
-      make_function t_void "PushBack" [ Option.value_exn t_param ]
-  | ArrayPopBack -> make_function t_void "PopBack" []
-  | ArrayEmpty -> make_function t_int "Empty" []
-  | ArrayErase -> make_function t_int "Erase" [ t_int ]
-  | ArrayInsert ->
-      make_function t_void "Insert" [ t_int; Option.value_exn t_param ]
-  | ArraySort -> make_function t_void "Sort" [ t_func ]
-  | ArrayFind ->
-      make_function t_int "Find"
-        [ t_int; t_int; Option.value_exn t_param; t_func ]
-  | ArrayReverse -> make_function t_void "Reverse" []
-  | DelegateSet -> make_function t_void "Set" [ t_method ]
-  | DelegateAdd -> make_function t_void "Add" [ t_method ]
-  | DelegateNumof -> make_function t_int "Numof" []
-  | DelegateExist -> make_function t_int "Exist" [ t_method ]
-  | DelegateErase -> make_function t_void "Erase" [ t_method ]
-  | DelegateClear -> make_function t_void "Clear" []
 
 type argtype =
   | Int
@@ -1606,7 +1481,8 @@ let args_of_opcode = function
   | C_REF -> []
   | C_ASSIGN -> []
   | MSG -> [ Message ]
-  | CALLHLL -> [ Library; LibraryFunction ] (* FIXME: Changed in ain >8 *)
+  | CALLHLL ->
+      [ Library; LibraryFunction (* FIXME: ain >8 has one more argument *) ]
   | PUSHSTRUCTPAGE -> []
   | CALLMETHOD -> [ Function ]
   | SH_GLOBALREF -> [ Global ]
@@ -1634,7 +1510,7 @@ let args_of_opcode = function
   | S_GTE -> []
   | S_LENGTH2 -> []
   | S_LENGTHBYTE2 -> []
-  | NEW -> [] (* FIXME: Changed in ain >8 *)
+  | NEW -> [ (* FIXME: ain >8 has two arguments *) ]
   | DELETE -> []
   | CHECKUDO -> []
   | A_REF -> []
@@ -1664,9 +1540,9 @@ let args_of_opcode = function
   | S_PUSHBACK -> []
   | S_POPBACK -> []
   | FTOS -> []
-  | S_MOD -> [] (* FIXME: Changed in ain >8 *)
+  | S_MOD -> [ (* FIXME: ain >8 has one argument *) ]
   | S_PLUSA2 -> []
-  | OBJSWAP -> [] (* FIXME: Changed in ain >8 *)
+  | OBJSWAP -> [ (* FIXME: ain >8 has one argument *) ]
   | S_ERASE -> []
   | SR_REF2 -> [ Struct ]
   | S_ERASE2 -> []
@@ -1774,7 +1650,7 @@ let args_of_opcode = function
   | DG_MINUSA -> []
   | DG_CALLBEGIN -> [ Delegate ]
   | DG_NEW -> []
-  | DG_STR_TO_METHOD -> [] (* FIXME: Changed in ain >8 *)
+  | DG_STR_TO_METHOD -> [ (* FIXME: ain >8 has one argument *) ]
   | OP_0X102 -> []
   | X_GETENV -> []
   | X_SET -> []

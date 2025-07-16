@@ -37,38 +37,6 @@ let range_contains text range (pos : Lsp.Types.Position.t) =
   && (end_.line > pos.line
      || (end_.line = pos.line && end_.character >= pos.character))
 
-let dummy_loc = (Lexing.dummy_pos, Lexing.dummy_pos)
-
-let predefined_constants =
-  [
-    Jaf.
-      {
-        name = "true";
-        type_ =
-          {
-            spec = { data = Bool; qualifier = Some Const };
-            location = dummy_loc;
-          };
-        location = dummy_loc;
-        array_dim = [];
-        initval = None;
-        index = None;
-      };
-    Jaf.
-      {
-        name = "false";
-        type_ =
-          {
-            spec = { data = Bool; qualifier = Some Const };
-            location = dummy_loc;
-          };
-        location = dummy_loc;
-        array_dim = [];
-        initval = None;
-        index = None;
-      };
-  ]
-
 type t = {
   ctx : Jaf.context;
   text : bytes;
@@ -78,7 +46,7 @@ type t = {
 
 external reraise : exn -> 'a = "%reraise"
 
-let make_error ain lexbuf exn =
+let make_error lexbuf exn =
   let make (lexbuf : Lexing.lexbuf) loc message =
     let range = to_lsp_range lexbuf.lex_buffer loc in
     (range, message)
@@ -86,47 +54,20 @@ let make_error ain lexbuf exn =
   match exn with
   | Lexer.Error | Parser.Error ->
       make lexbuf (lexbuf.lex_start_p, lexbuf.lex_curr_p) "Syntax error."
-  | CompileError.SyntaxError (msg, loc) -> make lexbuf loc msg
-  | CompileError.CompileError (msg, node) ->
-      make lexbuf (Jaf.ast_node_pos node) msg
-  | CompileError.Undefined_variable (name, node) ->
-      make lexbuf (Jaf.ast_node_pos node) ("Undefined variable: " ^ name)
-  | CompileError.Not_lvalue_error (_e, node) ->
-      make lexbuf (Jaf.ast_node_pos node) "Lvalue expected."
-  | CompileError.Type_error (expected, actual_opt, node) ->
-      let actual =
-        match actual_opt with
-        | Some actual -> (
-            match actual.valuetype with
-            | Some t -> "\n Actual type: " ^ Ain.type_to_string_hum ain t
-            | None -> "")
-        | None -> ""
-      in
-      make lexbuf (Jaf.ast_node_pos node)
-        ("Type error.\n Expected type: "
-        ^ Ain.type_to_string_hum ain expected
-        ^ actual)
-  | CompileError.Arity_error (func, args, node) ->
-      make lexbuf (Jaf.ast_node_pos node)
-        (Printf.sprintf
-           "Arity error. '%s' expects %d arguments, but %d provided." func.name
-           func.nr_args (List.length args))
+  | CompileError.Compile_error (Error (msg, loc)) -> make lexbuf loc msg
   | e -> reraise e
 
-let create ain ~fname text =
+let create ctx ~fname text =
   let lexbuf = Lexing.from_string text in
   Lexing.set_filename lexbuf fname;
-  let ctx =
-    Jaf.{ ain; import_ain = Ain.create 4 0; const_vars = predefined_constants }
-  in
   try
     let toplevel = Parser.jaf Lexer.token lexbuf in
     Declarations.register_type_declarations ctx toplevel;
-    Declarations.resolve_types ctx toplevel;
-    Declarations.define_types ctx toplevel;
+    Declarations.resolve_types ctx toplevel false;
     let errors =
       TypeAnalysis.check_types ctx toplevel
-      |> List.map ~f:(make_error ain lexbuf)
+      |> List.map ~f:(fun ce ->
+             make_error lexbuf (CompileError.Compile_error ce))
     in
     { ctx; text = lexbuf.lex_buffer; toplevel; errors }
   with e ->
@@ -134,7 +75,7 @@ let create ain ~fname text =
       ctx;
       text = lexbuf.lex_buffer;
       toplevel = [];
-      errors = [ make_error ain lexbuf e ];
+      errors = [ make_error lexbuf e ];
     }
 
 class ast_locator (doc : t) (pos : Lsp.Types.Position.t) =

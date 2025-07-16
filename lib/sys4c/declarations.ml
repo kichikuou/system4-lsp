@@ -24,68 +24,91 @@ open CompileError
 class type_declare_visitor ctx =
   object (self)
     inherit ivisitor ctx
-    val functions = Stack.create ()
+    val mutable gg_index = -1
 
     method declare_function (decl : fundecl) =
-      decl.index <-
-        Some
-          (match Ain.get_function ctx.ain decl.name with
-          | Some f -> f.index
-          | None -> (Ain.add_function ctx.ain decl.name).index);
-      Stack.push functions decl
+      decl.index <- Some (-1);
+      let name = mangled_name decl in
+      Hashtbl.set ctx.functions ~key:name ~data:decl
 
     method! visit_declaration decl =
       match decl with
-      | Global d ->
-          List.iter d.vars ~f:(fun g ->
-              match g.type_.spec.qualifier with
-              | Some Const -> ()
-              | _ ->
-                  g.index <-
-                    Some
-                      (match Ain.get_global ctx.ain g.name with
-                      | Some g -> g.index
-                      | None -> Ain.add_global ctx.ain g.name))
+      | Global ds ->
+          List.iter ds.vars ~f:(fun g ->
+              Hashtbl.set ctx.globals ~key:g.name ~data:g;
+              if not g.is_const then g.index <- Some (-1))
+      | GlobalGroup gg ->
+          gg_index <- Ain.add_global_group ctx.ain gg.name;
+          List.iter gg.vardecls ~f:(fun ds ->
+              self#visit_declaration (Global ds));
+          gg_index <- -1
       | Function f ->
-          Option.iter f.struct_name ~f:(fun s_name ->
-              f.name <- s_name ^ "@" ^ f.name;
-              f.class_index <- Ain.get_struct_index ctx.ain s_name);
+          (match f.class_name with
+          | Some name ->
+              if not (Hashtbl.mem ctx.structs name) then
+                compile_error
+                  ("undefined class name " ^ name)
+                  (ASTDeclaration decl)
+              else if not (Hashtbl.mem ctx.functions (mangled_name f)) then
+                compile_error
+                  (f.name ^ " is not declared in class " ^ name)
+                  (ASTDeclaration decl)
+          | None -> ());
           self#declare_function f
       | FuncTypeDef f ->
-          if Option.is_none (Ain.get_functype ctx.ain f.name) then
-            ignore (Ain.add_functype ctx.ain f.name : Ain.FunctionType.t)
+          Hashtbl.set ctx.functypes ~key:f.name
+            ~data:{ f with index = Some (-1) }
       | DelegateDef f ->
-          if Option.is_none (Ain.get_delegate ctx.ain f.name) then
-            ignore (Ain.add_delegate ctx.ain f.name : Ain.FunctionType.t)
+          Hashtbl.set ctx.delegates ~key:f.name
+            ~data:{ f with index = Some (-1) }
       | StructDef s ->
           let ain_s =
-            match Ain.get_struct ctx.ain s.name with
-            | Some s -> s
-            | None -> Ain.add_struct ctx.ain s.name
+            Option.value_or_thunk (Ain.get_struct ctx.ain s.name)
+              ~default:(fun () -> Ain.add_struct ctx.ain s.name)
           in
+          let jaf_s = new_jaf_struct s.name s.loc ain_s.index in
+          let next_index = ref 0 in
+          let in_private = ref s.is_class in
           let visit_decl = function
-            | AccessSpecifier _ -> ()
+            | AccessSpecifier Public -> in_private := false
+            | AccessSpecifier Private -> in_private := true
             | Constructor f ->
                 if not (String.equal f.name s.name) then
                   compile_error "constructor name doesn't match struct name"
                     (ASTDeclaration (Function f));
-                f.name <- s.name ^ "@0";
+                f.class_name <- Some s.name;
                 f.class_index <- Some ain_s.index;
+                f.is_private <- !in_private;
                 self#declare_function f
             | Destructor f ->
-                if not (String.equal f.name s.name) then
+                if not (String.equal f.name ("~" ^ s.name)) then
                   compile_error "destructor name doesn't match struct name"
                     (ASTDeclaration (Function f));
-                f.name <- s.name ^ "@1";
+                f.class_name <- Some s.name;
                 f.class_index <- Some ain_s.index;
+                f.is_private <- !in_private;
                 self#declare_function f
             | Method f ->
-                f.name <- s.name ^ "@" ^ f.name;
+                f.class_name <- Some s.name;
                 f.class_index <- Some ain_s.index;
+                f.is_private <- !in_private;
                 self#declare_function f
-            | MemberDecl _ -> ()
+            | MemberDecl ds ->
+                List.iter ds.vars ~f:(fun v ->
+                    v.is_private <- !in_private;
+                    if not v.is_const then (
+                      v.index <- Some !next_index;
+                      next_index :=
+                        !next_index
+                        + if is_ref_scalar v.type_spec.ty then 2 else 1);
+                    match Hashtbl.add jaf_s.members ~key:v.name ~data:v with
+                    | `Duplicate ->
+                        compile_error "duplicate member variable declaration"
+                          (ASTVariable v)
+                    | `Ok -> ())
           in
-          List.iter s.decls ~f:visit_decl
+          List.iter s.decls ~f:visit_decl;
+          Hashtbl.set ctx.structs ~key:s.name ~data:jaf_s
       | Enum _ ->
           compile_error "enum types not yet supported" (ASTDeclaration decl)
   end
@@ -94,103 +117,96 @@ let register_type_declarations ctx decls =
   (new type_declare_visitor ctx)#visit_toplevel decls
 
 (*
+ * AST pass to resolve HLL-specific type aliases.
+ *)
+class hll_type_resolve_visitor ctx =
+  object
+    inherit ivisitor ctx
+
+    method! visit_type_specifier ts =
+      match ts.ty with
+      | Unresolved "intp" -> ts.ty <- Ref Int
+      | Unresolved "floatp" -> ts.ty <- Ref Float
+      | Unresolved "stringp" -> ts.ty <- Ref String
+      | Unresolved "boolp" -> ts.ty <- Ref Bool
+      | _ -> ()
+  end
+
+let resolve_hll_types ctx decls =
+  (new hll_type_resolve_visitor ctx)#visit_toplevel decls
+
+(*
  * AST pass to resolve user-defined types (struct/enum/function types).
  *)
-class type_resolve_visitor ctx =
+class type_resolve_visitor ctx decl_only =
   object (self)
     inherit ivisitor ctx as super
 
     method resolve_type name node =
-      match Ain.get_struct_index ctx.ain name with
-      | Some i -> Struct (name, i)
+      match Hashtbl.find ctx.structs name with
+      | Some s -> Struct (name, s.index)
       | None -> (
-          match Ain.get_struct ctx.import_ain name with
-          | Some s ->
-              (* import struct declaration *)
-              Struct (name, Ain.write_new_struct ctx.ain s)
+          match Hashtbl.find ctx.functypes name with
+          | Some _ -> FuncType (Some (name, -1))
           | None -> (
-              match Ain.get_functype_index ctx.ain name with
-              | Some i -> FuncType (name, i)
+              match Hashtbl.find ctx.delegates name with
+              | Some _ -> Delegate (Some (name, -1))
               | None -> (
-                  match Ain.get_functype ctx.import_ain name with
-                  | Some ft ->
-                      (* import functype declaration *)
-                      FuncType (name, Ain.write_new_functype ctx.ain ft)
-                  | None -> (
-                      match Ain.get_delegate_index ctx.ain name with
-                      | Some i -> Delegate (name, i)
-                      | None -> (
-                          match Ain.get_delegate ctx.import_ain name with
-                          | Some ft ->
-                              (* import delegate declaration *)
-                              Delegate (name, Ain.write_new_delegate ctx.ain ft)
-                          | None ->
-                              compile_error ("Undefined type: " ^ name) node))))
-          )
+                  match name with
+                  | "IMainSystem" -> IMainSystem
+                  | _ -> compile_error ("Undefined type: " ^ name) node)))
 
-    method! visit_type_specifier type_ =
-      let rec resolve_typespec ts =
-        match ts.data with
-        | Unresolved t -> ts.data <- self#resolve_type t (ASTType type_)
-        | Array t | Wrap t -> resolve_typespec t
-        | _ -> ()
+    method! visit_type_specifier ts =
+      let rec resolve t =
+        match t with
+        | Unresolved t -> self#resolve_type t (ASTType ts)
+        | Ref t -> Ref (resolve t)
+        | Array t -> Array (resolve t)
+        | Wrap t -> Wrap (resolve t)
+        | _ -> t
       in
-      resolve_typespec type_.spec
-
-    method! visit_expression expr =
-      (match expr.node with
-      | New (Unresolved t, e, _) ->
-          expr.node <- New (self#resolve_type t (ASTExpression expr), e, None)
-      | _ -> ());
-      super#visit_expression expr
-  end
-
-let resolve_types ctx decls =
-  (new type_resolve_visitor ctx)#visit_toplevel decls
-
-(*
- * AST pass over top-level declarations to define function/struct types.
- *)
-class type_define_visitor ctx =
-  object
-    inherit ivisitor ctx
+      ts.ty <- resolve ts.ty
 
     method! visit_declaration decl =
-      match decl with
-      | Global d ->
-          List.iter d.vars ~f:(fun g ->
-              match g.type_.spec.qualifier with
-              | Some Const ->
-                  ctx.const_vars <-
-                    g :: ctx.const_vars (* FIXME: replace existing entry *)
-              | _ ->
-                  Ain.set_global_type_loc ctx.ain g.name
-                    (jaf_to_ain_type g.type_.spec)
-                    g.location)
-      | Function f ->
-          let obj =
-            Ain.get_function_by_index ctx.ain (Option.value_exn f.index)
-          in
-          obj |> jaf_to_ain_function f |> Ain.write_function ctx.ain
-      | FuncTypeDef f -> (
-          match Ain.get_functype ctx.ain f.name with
-          | Some obj ->
-              obj |> jaf_to_ain_functype f |> Ain.write_functype ctx.ain
-          | None ->
-              compiler_bug "undefined functype" (Some (ASTDeclaration decl)))
-      | DelegateDef f -> (
-          match Ain.get_delegate ctx.ain f.name with
-          | Some obj ->
-              obj |> jaf_to_ain_functype f |> Ain.write_delegate ctx.ain
-          | None ->
-              compiler_bug "undefined delegate" (Some (ASTDeclaration decl)))
-      | StructDef s -> (
-          match Ain.get_struct ctx.ain s.name with
-          | Some obj -> obj |> jaf_to_ain_struct s |> Ain.write_struct ctx.ain
-          | None -> compiler_bug "undefined struct" (Some (ASTDeclaration decl))
-          )
+      (match decl with
+      | Function f -> (
+          match f.class_name with
+          | Some name ->
+              f.class_index <- Some (Hashtbl.find_exn ctx.structs name).index
+          | _ -> ())
+      | FuncTypeDef _ | DelegateDef _ | Global _ | GlobalGroup _ | StructDef _
+        ->
+          ()
       | Enum _ ->
-          compile_error "Enum types not yet supported" (ASTDeclaration decl)
+          compile_error "enum types not yet supported" (ASTDeclaration decl));
+      if not decl_only then super#visit_declaration decl
   end
 
-let define_types ctx decls = (new type_define_visitor ctx)#visit_toplevel decls
+let resolve_types ctx decls decl_only =
+  (new type_resolve_visitor ctx decl_only)#visit_toplevel decls
+
+let define_library ctx decls hll_name import_name =
+  let is_struct_def decl = match decl with StructDef _ -> true | _ -> false in
+  let struct_defs, fun_decls = List.partition_tf decls ~f:is_struct_def in
+  (* handle struct definitions *)
+  register_type_declarations ctx struct_defs;
+  resolve_types ctx struct_defs true;
+  (* define library *)
+  let functions =
+    List.map fun_decls ~f:(function
+      | Function f -> f
+      | decl ->
+          compiler_bug "unexpected declaration in .hll file"
+            (Some (ASTDeclaration decl)))
+  in
+  Ain.write_library ctx.ain
+    {
+      (Ain.add_library ctx.ain hll_name) with
+      functions = List.map ~f:jaf_to_ain_hll_function functions;
+    };
+  let functions =
+    Hashtbl.of_alist_exn
+      (module String)
+      (List.map ~f:(fun d -> (d.name, d)) functions)
+  in
+  Hashtbl.add_exn ctx.libraries ~key:import_name ~data:{ hll_name; functions }

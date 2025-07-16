@@ -16,27 +16,95 @@
 
 open Base
 open Jaf
+open Printf
 
-exception SyntaxError of string * location
-exception Type_error of Ain.Type.t * expression option * ast_node
-exception Undefined_variable of string * ast_node
-exception Arity_error of Ain.Function.t * expression list * ast_node
-exception Not_lvalue_error of expression * ast_node
-exception CompileError of string * ast_node
-exception CompilerBug of string * ast_node option
+let printf = Stdio.printf
 
-let syntax_error str loc = raise (SyntaxError (str, loc))
+type compile_error =
+  | Error of string * location
+  | ErrorList of compile_error list
 
-let data_type_error data expr parent =
-  raise (Type_error ({ data; is_ref = false }, expr, parent))
+exception Compile_error of compile_error
 
-let ref_type_error data expr parent =
-  raise (Type_error ({ data; is_ref = true }, expr, parent))
+let raise msg loc = Base.raise (Compile_error (Error (msg, loc)))
+let raise_list es = Base.raise (Compile_error (ErrorList es))
+
+let syntax_error lexbuf =
+  raise "Syntax error" (Lexing.lexeme_start_p lexbuf, Lexing.lexeme_end_p lexbuf)
+
+let type_error expected actual parent =
+  let s_expected = jaf_type_to_string expected in
+  let s_actual =
+    match actual with None -> "void" | Some expr -> jaf_type_to_string expr.ty
+  in
+  raise
+    (sprintf "Type error: expected %s; got %s" s_expected s_actual)
+    (ast_node_pos
+       (match actual with Some e -> ASTExpression e | None -> parent))
 
 let undefined_variable_error name parent =
-  raise (Undefined_variable (name, parent))
+  raise ("Undefined variable: " ^ name) (ast_node_pos parent)
 
-let arity_error t args parent = raise (Arity_error (t, args, parent))
-let not_an_lvalue_error expr parent = raise (Not_lvalue_error (expr, parent))
-let compile_error str node = raise (CompileError (str, node))
-let compiler_bug str node = raise (CompilerBug (str, node))
+let arity_error name nr_params args parent =
+  raise
+    (sprintf "Wrong number of arguments to function %s (expected %d; got %d)"
+       name nr_params (List.length args))
+    (ast_node_pos parent)
+
+let not_an_lvalue_error expr parent =
+  raise ("Not an lvalue: " ^ expr_to_string expr) (ast_node_pos parent)
+
+let const_error v =
+  raise
+    (match v.initval with
+    | Some _ -> "Value of const variable is not constant"
+    | None -> "Const variable lacks initializer")
+    v.location
+
+let compile_error str node = raise str (ast_node_pos node)
+
+let compiler_bug str node =
+  raise
+    (str ^ " (This is a compiler bug!)")
+    (match node with Some n -> ast_node_pos n | None -> dummy_location)
+
+let format_location (s, e) =
+  Lexing.(
+    let scol = s.pos_cnum - s.pos_bol + 1 in
+    let ecol = e.pos_cnum - e.pos_bol + 1 in
+    if s.pos_lnum = e.pos_lnum then
+      sprintf "%s:%d:%d-%d" s.pos_fname s.pos_lnum scol ecol
+    else sprintf "%s:%d:%d-%d:%d" s.pos_fname s.pos_lnum scol e.pos_lnum ecol)
+
+let detab = String.substr_replace_all ~pattern:"\t" ~with_:"    "
+
+let print_underline c s =
+  let len = String.length (Sjis.from_utf8 (detab s)) in
+  Stdio.print_string (String.make len c)
+
+let rec print_error err get_source_text =
+  match err with
+  | ErrorList es -> List.iter es ~f:(fun e -> print_error e get_source_text)
+  | Error (msg, (s, e)) -> (
+      printf "%s: %s\n" (format_location (s, e)) msg;
+      match get_source_text s.pos_fname with
+      | None -> ()
+      | Some src ->
+          let lines = String.split_lines src in
+          if s.pos_lnum <= 0 then ()
+          else if s.pos_lnum = e.pos_lnum then (
+            let line = List.nth_exn lines (s.pos_lnum - 1) in
+            printf "%5d | %s\n        " s.pos_lnum (detab line);
+            print_underline ' '
+              (String.sub line ~pos:0 ~len:(s.pos_cnum - s.pos_bol));
+            print_underline '^'
+              (String.sub line ~pos:(s.pos_cnum - s.pos_bol)
+                 ~len:(e.pos_cnum - s.pos_cnum));
+            Stdio.print_endline "")
+          else
+            let error_lines =
+              List.sub lines ~pos:(s.pos_lnum - 1)
+                ~len:(e.pos_lnum - s.pos_lnum + 1)
+            in
+            List.iteri error_lines ~f:(fun i line ->
+                printf "%5d | %s\n" (i + s.pos_lnum) line))

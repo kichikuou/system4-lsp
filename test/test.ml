@@ -3,7 +3,11 @@ open Sys4c
 open System4_lsp
 
 let analyze source =
-  let doc = Document.create (Ain.create 4 0) ~fname:"test.jaf" source in
+  let doc =
+    Document.create
+      (Jaf.context_from_ain (Ain.create 4 0))
+      ~fname:"test.jaf" source
+  in
   if List.is_empty doc.errors then Stdio.print_endline "ok"
   else
     List.iter doc.errors ~f:(fun (range, message) ->
@@ -37,13 +41,13 @@ let%expect_test "arity error" =
     int c = system.Exit();
   |};
   [%expect
-    {| (1, 12) - (1, 25) Arity error. 'Exit' expects 1 arguments, but 0 provided. |}]
+    {| (1, 12) - (1, 25) Wrong number of arguments to function Exit (expected 1; got 0) |}]
 
 let%expect_test "not lvalue error" =
   analyze {|
     ref int c = 3;
   |};
-  [%expect {| (1, 12) - (1, 17) Lvalue expected. |}]
+  [%expect {| (1, 12) - (1, 17) Not an lvalue: 3 |}]
 
 let%expect_test "undefined type error" =
   analyze {|
@@ -55,11 +59,7 @@ let%expect_test "type error" =
   analyze {|
     void f() { int x = "s"; }
   |};
-  [%expect
-    {|
-      (1, 19) - (1, 26) Type error.
-       Expected type: int
-       Actual type: string |}]
+  [%expect {| (1, 23) - (1, 26) Type error: expected int; got string |}]
 
 let%expect_test "function call" =
   analyze
@@ -94,17 +94,12 @@ let%expect_test "function call" =
     |};
   [%expect
     {|
-      (18, 18) - (18, 19) Lvalue expected.
-      (21, 20) - (21, 21) Lvalue expected.
-      (22, 20) - (22, 21) Type error.
-       Expected type: float
-       Actual type: int
-      (23, 20) - (23, 22) Type error.
-       Expected type: float
-       Actual type: int
-      (25, 15) - (25, 23) Type error.
-       Expected type: func
-       Actual type: ref void f_float(float x) |}]
+    (18, 18) - (18, 19) Not an lvalue: 3
+    (21, 20) - (21, 21) Not an lvalue: 3
+    (22, 20) - (22, 21) Type error: expected ref float; got int
+    (23, 20) - (23, 22) Type error: expected ref float; got ref int
+    (25, 15) - (25, 23) Type error: expected func; got void(float)
+    |}]
 
 let%expect_test "return statement" =
   analyze
@@ -137,20 +132,12 @@ let%expect_test "return statement" =
     |};
   [%expect
     {|
-      (4, 8) - (4, 17) Type error.
-       Expected type: void
-       Actual type: int
-      (7, 8) - (7, 15) Type error.
-       Expected type: int
-      (10, 8) - (10, 19) Type error.
-       Expected type: int
-       Actual type: string
-      (19, 8) - (19, 18) Type error.
-       Expected type: int
-       Actual type: float
-      (24, 8) - (24, 22) Type error.
-       Expected type: func
-       Actual type: ref int f_int() |}]
+    (4, 15) - (4, 16) Type error: expected void; got int
+    (7, 8) - (7, 15) Type error: expected int; got void
+    (10, 15) - (10, 18) Type error: expected int; got string
+    (19, 15) - (19, 17) Type error: expected ref int; got ref float
+    (24, 15) - (24, 21) Type error: expected func; got int()
+    |}]
 
 let%expect_test "variable declarations" =
   analyze {|
@@ -170,7 +157,7 @@ let%expect_test "class declarations" =
 let%expect_test "RefAssign operator" =
   analyze
     {|
-      struct S { int f; ref int rf; };
+      struct S { int i; ref int ri; void f(ref S other); };
       ref int ref_val() { return NULL; }
       ref S ref_S() { return NULL; }
       int g_i;
@@ -188,49 +175,34 @@ let%expect_test "RefAssign operator" =
         ra <- ref_S();    // error: referenced type mismatch
         ra <- 3;          // error: rhs is not a lvalue
         ref_val() <- ra;  // error: lhs is not a variable
-        s.rf <- ra;       // ok
-        s.f <- ra;        // error: lhs is not a reference
+        s.ri <- ra;       // ok
+        s.i <- ra;        // error: lhs is not a reference
         other <- this;    // ok
         this <- other;    // error: lhs is not a reference
         g_ri <- ra;       // ok
         g_i <- ra;        // error: lhs is not a reference
-        false <- NULL;    // error: lhs is not a reference
+        3 <- NULL;    // error: lhs is not a reference
         undefined <- ra;  // error: undefined is not defined
       }
     |};
   [%expect
     {|
-      (12, 8) - (12, 16) Type error.
-       Expected type: ref int
-       Actual type: int
-      (13, 8) - (13, 19) Type error.
-       Expected type: ref int
-       Actual type: null
-      (16, 8) - (16, 22) Type error.
-       Expected type: int
-       Actual type: ref S
-      (17, 8) - (17, 16) Lvalue expected.
-      (18, 8) - (18, 24) Type error.
-       Expected type: ref int
-       Actual type: ref int
-      (20, 8) - (20, 18) Type error.
-       Expected type: ref int
-       Actual type: int
-      (22, 8) - (22, 22) Type error.
-       Expected type: ref S
-       Actual type: S
-      (24, 8) - (24, 18) Type error.
-       Expected type: ref int
-       Actual type: int
-      (25, 8) - (25, 22) Type error.
-       Expected type: ref null
-       Actual type: bool
-      (26, 8) - (26, 17) Undefined variable: undefined |}]
+    (12, 8) - (12, 9) Type error: expected ref int; got int
+    (13, 8) - (13, 12) Type error: expected ref int; got null
+    (16, 14) - (16, 21) Type error: expected ref int; got ref S
+    (17, 8) - (17, 16) Not an lvalue: 3
+    (18, 8) - (18, 17) Type error: expected ref int; got ref int
+    (20, 8) - (20, 11) Type error: expected ref int; got int
+    (22, 8) - (22, 12) Type error: expected ref S; got S
+    (24, 8) - (24, 11) Type error: expected ref int; got int
+    (25, 8) - (25, 9) Type error: expected ref null; got int
+    (26, 8) - (26, 17) Undefined variable: undefined
+    |}]
 
 let%expect_test "RefEqual operator" =
   analyze
     {|
-      struct S { int f; ref int rf; };
+      struct S { int i; ref int ri; void f(ref S other); };
       ref int ref_int() { return NULL; }
       ref S ref_S() { return NULL; }
       int g_i;
@@ -249,44 +221,31 @@ let%expect_test "RefEqual operator" =
         ref_S() === ra;    // error: referenced type mismatch
         ra === 3;          // error: rhs is not a lvalue
         ref_int() === ra;  // ok
-        s.rf === ra;       // ok
-        s.f === ra;        // error: lhs is not a reference
+        s.ri === ra;       // ok
+        s.i === ra;        // error: lhs is not a reference
         other === this;    // ok
         this === other;    // error: lhs is not a reference
         ref_S() === this;  // ok
         ref_S() === NULL;  // ok
         g_ri === ra;       // ok
         g_i === ra;        // error: lhs is not a reference
-        false === NULL;    // error: lhs is not a reference
+        3 === NULL;    // error: lhs is not a reference
         undefined === ra;  // error: undefined is not defined
       }
     |};
   [%expect
     {|
-      (12, 8) - (12, 16) Type error.
-       Expected type: ref int
-       Actual type: int
-      (13, 8) - (13, 19) Type error.
-       Expected type: null
-       Actual type: int
-      (16, 8) - (16, 22) Type error.
-       Expected type: int
-       Actual type: ref S
-      (17, 8) - (17, 22) Type error.
-       Expected type: S
-       Actual type: int
-      (18, 8) - (18, 16) Lvalue expected.
-      (21, 8) - (21, 18) Type error.
-       Expected type: ref int
-       Actual type: int
-      (23, 8) - (23, 22) Lvalue expected.
-      (27, 8) - (27, 18) Type error.
-       Expected type: ref int
-       Actual type: int
-      (28, 8) - (28, 22) Type error.
-       Expected type: ref null
-       Actual type: bool
-      (29, 8) - (29, 17) Undefined variable: undefined |}]
+    (12, 8) - (12, 9) Type error: expected ref int; got int
+    (13, 8) - (13, 19) Not an lvalue: NULL
+    (16, 15) - (16, 22) Type error: expected ref int; got ref S
+    (17, 20) - (17, 22) Type error: expected ref S; got ref int
+    (18, 8) - (18, 16) Not an lvalue: 3
+    (21, 8) - (21, 11) Type error: expected ref int; got int
+    (23, 8) - (23, 22) Not an lvalue: this
+    (27, 8) - (27, 11) Type error: expected ref int; got int
+    (28, 8) - (28, 18) Not an lvalue: 3
+    (29, 8) - (29, 17) Undefined variable: undefined
+    |}]
 
 let%expect_test "label_is_a_statement" =
   analyze

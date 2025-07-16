@@ -25,6 +25,7 @@
   ocaml
   base
   stdio
+  vector
   camlzip
   dune
   dune-build-info

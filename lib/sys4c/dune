@@ -1,6 +1,6 @@
 (library
  (name sys4c)
- (libraries base stdio camlzip))
+ (libraries base stdio camlzip vector))
 
 (ocamllex lexer)
 
