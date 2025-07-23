@@ -739,7 +739,7 @@ and var_to_string' d =
     | None -> ""
     | Some e -> sprintf " = %s" (expr_to_string e)
   in
-  sprintf "%s%s%s" dims d.name init
+  sprintf "%s %s%s%s" (jaf_type_to_string d.type_spec.ty) dims d.name init
 
 and var_to_string d =
   let t = jaf_type_to_string d.type_spec.ty in

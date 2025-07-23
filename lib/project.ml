@@ -66,25 +66,32 @@ let get_hover proj uri pos =
              ~range:(to_lsp_range doc.text location)
              ())
       in
-      let ain_function_to_string f =
-        Jaf.decl_to_string (Function (Jaf.ain_to_jaf_function proj.ctx.ain f))
-      in
       match get_nodes_for_pos doc pos with
       | Jaf.ASTExpression { node = Member (_, _, SystemFunction sys); loc; _ }
         :: _ ->
-          let f = Builtin.function_of_syscall sys in
-          make_hover loc (ain_function_to_string f)
+          let f = Builtin.fundecl_of_syscall sys in
+          make_hover loc (Jaf.decl_to_string (Function f))
       | Jaf.ASTExpression
           { node = Member (_, _, HLLFunction (lib_name, fun_name)); loc; _ }
         :: _ ->
           Option.bind (Jaf.find_hll_function proj.ctx lib_name fun_name)
             ~f:(fun decl -> make_hover loc (Jaf.decl_to_string (Function decl)))
-      | Jaf.ASTExpression
-          { node = Member (obj, _, BuiltinMethod builtin); loc; _ }
+      | (Jaf.ASTExpression
+           { node = Member (obj, _, BuiltinMethod builtin); loc; _ } as ast_node)
         :: _ ->
           let elem_t = match obj.ty with Array t -> t | _ -> Void in
-          let f = Builtin.function_of_builtin proj.ctx builtin elem_t in
-          make_hover loc (ain_function_to_string f)
+          let f =
+            Builtin.fundecl_of_builtin proj.ctx builtin elem_t (Some ast_node)
+          in
+          make_hover loc (Jaf.decl_to_string (Function f))
+      | Jaf.ASTExpression
+          { node = Member (_, _, ClassMethod (name, _)); loc; _ }
+        :: _
+      | Jaf.ASTExpression { node = Ident (_, FunctionName name); loc; _ } :: _
+        ->
+          Option.bind (Hashtbl.find proj.ctx.functions name) ~f:(fun decl ->
+              make_hover loc
+                (Jaf.decl_to_string (Function { decl with body = None })))
       | Jaf.ASTExpression { ty; loc; _ } :: _ ->
           make_hover loc (Jaf.jaf_type_to_string ty)
       | Jaf.ASTType { ty; location } :: _ -> (
