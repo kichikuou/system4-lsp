@@ -859,21 +859,24 @@ let rec jaf_to_ain_type = function
   | MemberPtr _ -> Ain.Type.Int (* slot number *)
   | TypeUnion _ -> failwith "tried to convert TypeUnion to ain data type"
 
-let rec ain_to_jaf_type = function
+let rec ain_to_jaf_type ain = function
   | Ain.Type.Void -> Void
   | Int -> Int
   | LongInt -> LongInt
   | Bool -> Bool
   | Float -> Float
   | String -> String
-  | Struct i -> Struct ("", i)
-  | Array t -> Array (ain_to_jaf_type t)
-  | Ref t -> Ref (ain_to_jaf_type t)
-  | Wrap t -> Wrap (ain_to_jaf_type t)
+  | Struct -1 -> Struct ("struct", -1)
+  | Struct i -> Struct ((Ain.get_struct_by_index ain i).name, i)
+  | Array t -> Array (ain_to_jaf_type ain t)
+  | Ref t -> Ref (ain_to_jaf_type ain t)
+  | Wrap t -> Wrap (ain_to_jaf_type ain t)
   | HLLParam -> HLLParam
   | HLLFunc -> HLLFunc
-  | Delegate i -> Delegate (Some ("", i))
-  | FuncType i -> FuncType (Some ("", i))
+  | Delegate -1 -> Delegate None
+  | Delegate i -> Delegate (Some ((Ain.get_delegate_by_index ain i).name, i))
+  | FuncType -1 -> FuncType None
+  | FuncType i -> FuncType (Some ((Ain.get_functype_by_index ain i).name, i))
   | IMainSystem -> IMainSystem
   | t ->
       Printf.failwithf "cannot convert %s to jaf type" (Ain.Type.to_string t) ()
@@ -951,7 +954,7 @@ let jaf_to_ain_hll_function j_f =
   let arguments = List.map j_f.params ~f:jaf_to_ain_hll_argument in
   Ain.Library.Function.create j_f.name return_type arguments
 
-let ain_to_jaf_variable kind (v : Ain.Variable.t) =
+let ain_to_jaf_variable ain kind (v : Ain.Variable.t) =
   {
     name = v.name;
     location = dummy_location;
@@ -959,7 +962,8 @@ let ain_to_jaf_variable kind (v : Ain.Variable.t) =
     is_const = false;
     is_private = false;
     kind;
-    type_spec = { ty = ain_to_jaf_type v.value_type; location = dummy_location };
+    type_spec =
+      { ty = ain_to_jaf_type ain v.value_type; location = dummy_location };
     initval = None;
     index = Some v.index;
   }
@@ -973,10 +977,11 @@ let ain_to_jaf_function ain (f : Ain.Function.t) =
   {
     name = f.name;
     loc = dummy_location;
-    return = { ty = ain_to_jaf_type f.return_type; location = dummy_location };
+    return =
+      { ty = ain_to_jaf_type ain f.return_type; location = dummy_location };
     params =
       List.map (Ain.Function.logical_parameters f) ~f:(fun v ->
-          ain_to_jaf_variable Parameter v);
+          ain_to_jaf_variable ain Parameter v);
     body = None;
     is_label = f.is_label;
     is_private = false;
@@ -1016,10 +1021,11 @@ let context_from_ain ain =
     {
       name = f.name;
       loc = dummy_location;
-      return = { ty = ain_to_jaf_type f.return_type; location = dummy_location };
+      return =
+        { ty = ain_to_jaf_type ain f.return_type; location = dummy_location };
       params =
         List.map (Ain.FunctionType.logical_parameters f) ~f:(fun v ->
-            ain_to_jaf_variable Parameter v);
+            ain_to_jaf_variable ain Parameter v);
       body = None;
       is_label = false;
       is_private = false;
@@ -1038,7 +1044,7 @@ let context_from_ain ain =
       Hashtbl.add_exn globals ~key:v.name ~data:v);
   Ain.global_iter ain ~f:(fun g ->
       Hashtbl.add_exn globals ~key:g.variable.name
-        ~data:(ain_to_jaf_variable GlobalVar g.variable));
+        ~data:(ain_to_jaf_variable ain GlobalVar g.variable));
   Ain.struct_iter ain ~f:(fun s ->
       let struc =
         {
@@ -1050,7 +1056,7 @@ let context_from_ain ain =
       in
       List.iter s.members ~f:(fun v ->
           Hashtbl.add_exn struc.members ~key:v.name
-            ~data:(ain_to_jaf_variable ClassVar v));
+            ~data:(ain_to_jaf_variable ain ClassVar v));
       Hashtbl.add_exn structs ~key:s.name ~data:struc);
   Ain.function_iter ain ~f:(fun (f : Ain.Function.t) ->
       let class_name, class_index =
@@ -1063,10 +1069,13 @@ let context_from_ain ain =
           name = f.name;
           loc = dummy_location;
           return =
-            { ty = ain_to_jaf_type f.return_type; location = dummy_location };
+            {
+              ty = ain_to_jaf_type ain f.return_type;
+              location = dummy_location;
+            };
           params =
             List.map (Ain.Function.logical_parameters f) ~f:(fun v ->
-                ain_to_jaf_variable Parameter v);
+                ain_to_jaf_variable ain Parameter v);
           body = None;
           is_label = f.is_label;
           is_private = false;
@@ -1089,7 +1098,7 @@ let context_from_ain ain =
               loc = dummy_location;
               return =
                 {
-                  ty = ain_to_jaf_type f.return_type;
+                  ty = ain_to_jaf_type ain f.return_type;
                   location = dummy_location;
                 };
               params =
@@ -1103,7 +1112,7 @@ let context_from_ain ain =
                       kind = Parameter;
                       type_spec =
                         {
-                          ty = ain_to_jaf_type v.value_type;
+                          ty = ain_to_jaf_type ain v.value_type;
                           location = dummy_location;
                         };
                       initval = None;
