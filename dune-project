@@ -2,7 +2,7 @@
 (using menhir 2.1)
 
 (name system4_lsp)
-(version 0.0.3)
+(version 0.1.0)
 
 (generate_opam_files true)
 
