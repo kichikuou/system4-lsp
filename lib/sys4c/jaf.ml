@@ -1084,7 +1084,7 @@ let context_from_ain ain =
           class_index;
         }
       in
-      Hashtbl.add_exn functions ~key:f.name ~data:func);
+      Hashtbl.set functions ~key:f.name ~data:func);
   Ain.functype_iter ain ~f:(fun (f : Ain.FunctionType.t) ->
       Hashtbl.add_exn functypes ~key:f.name ~data:(ain_to_jaf_functype f));
   Ain.delegate_iter ain ~f:(fun (f : Ain.FunctionType.t) ->
