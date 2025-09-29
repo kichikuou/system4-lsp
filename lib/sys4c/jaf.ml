@@ -1126,7 +1126,7 @@ let context_from_ain ain =
               class_index = None;
             }
           in
-          Hashtbl.add_exn functions ~key:f.name ~data:func);
+          Hashtbl.set functions ~key:f.name ~data:func);
       Hashtbl.add_exn libraries ~key:l.name
         ~data:{ hll_name = l.name; functions });
   { ain; globals; structs; functions; functypes; delegates; libraries }
