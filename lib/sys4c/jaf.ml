@@ -968,55 +968,7 @@ let ain_to_jaf_variable ain kind (v : Ain.Variable.t) =
     index = Some v.index;
   }
 
-let ain_to_jaf_function ain (f : Ain.Function.t) =
-  let class_name, class_index =
-    match String.lsplit2 f.name ~on:'@' with
-    | None -> (None, None)
-    | Some (left, _) -> (Some left, Ain.get_struct_index ain left)
-  in
-  {
-    name = f.name;
-    loc = dummy_location;
-    return =
-      { ty = ain_to_jaf_type ain f.return_type; location = dummy_location };
-    params =
-      List.map (Ain.Function.logical_parameters f) ~f:(fun v ->
-          ain_to_jaf_variable ain Parameter v);
-    body = None;
-    is_label = f.is_label;
-    is_private = false;
-    index = Some f.index;
-    class_name;
-    class_index;
-  }
-
-let context_from_ain ain =
-  let predefined_constants =
-    [
-      {
-        name = "true";
-        location = dummy_location;
-        array_dim = [];
-        is_const = true;
-        is_private = false;
-        kind = GlobalVar;
-        type_spec = { ty = Bool; location = dummy_location };
-        initval = None;
-        index = None;
-      };
-      {
-        name = "false";
-        location = dummy_location;
-        array_dim = [];
-        is_const = true;
-        is_private = false;
-        kind = GlobalVar;
-        type_spec = { ty = Bool; location = dummy_location };
-        initval = None;
-        index = None;
-      };
-    ]
-  in
+let context_from_ain ?(constants : variable list = []) ain =
   let ain_to_jaf_functype (f : Ain.FunctionType.t) =
     {
       name = f.name;
@@ -1040,8 +992,7 @@ let context_from_ain ain =
   let functypes = Hashtbl.create (module String) in
   let delegates = Hashtbl.create (module String) in
   let libraries = Hashtbl.create (module String) in
-  List.iter predefined_constants ~f:(fun v ->
-      Hashtbl.add_exn globals ~key:v.name ~data:v);
+  List.iter constants ~f:(fun v -> Hashtbl.add_exn globals ~key:v.name ~data:v);
   Ain.global_iter ain ~f:(fun g ->
       Hashtbl.add_exn globals ~key:g.variable.name
         ~data:(ain_to_jaf_variable ain GlobalVar g.variable));

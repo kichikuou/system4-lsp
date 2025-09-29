@@ -17,10 +17,36 @@ type t = {
   documents : (string, Document.t) Hashtbl.t;
 }
 
+let predefined_constants =
+  Jaf.
+    [
+      {
+        name = "true";
+        location = dummy_location;
+        array_dim = [];
+        is_const = true;
+        is_private = false;
+        kind = GlobalVar;
+        type_spec = { ty = Bool; location = dummy_location };
+        initval = None;
+        index = None;
+      };
+      {
+        name = "false";
+        location = dummy_location;
+        array_dim = [];
+        is_const = true;
+        is_private = false;
+        kind = GlobalVar;
+        type_spec = { ty = Bool; location = dummy_location };
+        initval = None;
+        index = None;
+      };
+    ]
+
 let create () =
-  let ctx = Jaf.context_from_ain (Ain.create 4 0) in
   {
-    ctx;
+    ctx = Jaf.context_from_ain ~constants:predefined_constants (Ain.create 4 0);
     srcdir = "";
     srcEncoding = ShiftJIS;
     documents = Hashtbl.create (module String);
@@ -29,7 +55,9 @@ let create () =
 let initialize proj (options : Types.InitializationOptions.t) =
   proj.srcdir <- options.srcDir;
   if not (String.is_empty options.ainPath) then
-    proj.ctx <- Jaf.context_from_ain (Ain.load options.ainPath);
+    proj.ctx <-
+      Jaf.context_from_ain ~constants:predefined_constants
+        (Ain.load options.ainPath);
   if not (String.is_empty options.srcEncoding) then
     proj.srcEncoding <- encoding_of_string options.srcEncoding
 
