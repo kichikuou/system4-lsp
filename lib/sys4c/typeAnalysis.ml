@@ -331,7 +331,7 @@ class type_analyze_visitor ctx =
       | Ident (name, _) -> (
           match environment#resolve name with
           | ResolvedLocal v ->
-              expr.node <- Ident (name, LocalVariable v.location);
+              expr.node <- Ident (name, LocalVariable (-1, v.location));
               expr.ty <- v.type_spec.ty
           | ResolvedGlobal g ->
               let ident_type =
@@ -805,3 +805,7 @@ let check_types ctx decls =
   let visitor = new type_analyze_visitor ctx in
   visitor#visit_toplevel decls;
   visitor#errors
+
+let check_types_exn ctx decls =
+  let errors = check_types ctx decls in
+  if not (List.is_empty errors) then raise_list errors

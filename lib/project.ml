@@ -153,7 +153,7 @@ let find_location proj uri pos f =
 
 let get_definition proj uri pos =
   find_location proj uri pos (function
-    | Jaf.ASTExpression { node = Ident (_, LocalVariable loc); _ } :: _ ->
+    | Jaf.ASTExpression { node = Ident (_, LocalVariable (_, loc)); _ } :: _ ->
         Some loc
     | Jaf.ASTExpression { node = Ident (name, GlobalVariable _); _ } :: _ -> (
         match Hashtbl.find proj.ctx.globals name with
