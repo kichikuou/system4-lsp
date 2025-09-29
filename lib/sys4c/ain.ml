@@ -453,12 +453,12 @@ type t = {
   string_table : (string, int) Hashtbl.t;
 }
 
-let create major_version minor_version =
+let create ?is_ain2 ?(keyc = 0l) major_version minor_version =
   {
-    is_ain2 = major_version >= 5;
+    is_ain2 = Option.value is_ain2 ~default:(major_version >= 5);
     major_version;
     minor_version;
-    keyc = 0l;
+    keyc;
     code = Bytes.of_string "";
     functions = [| Function.create ~index:0 "NULL" |];
     globals = [||];
